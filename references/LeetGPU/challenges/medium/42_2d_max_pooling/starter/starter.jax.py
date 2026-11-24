@@ -1,0 +1,11 @@
+import jax
+import jax.numpy as jnp
+
+
+# input is a tensor on device
+@jax.jit
+def solve(
+    input: jax.Array, N: int, C: int, H: int, W: int, kernel_size: int, stride: int, padding: int
+) -> jax.Array:
+    # return output tensor directly
+    pass

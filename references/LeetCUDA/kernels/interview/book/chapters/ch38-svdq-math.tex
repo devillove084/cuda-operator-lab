@@ -1,0 +1,1489 @@
+% ch38-svdq-math.tex — SVDQuant(一)：从 SmoothQuant 到 SVDQuant 的数学原理（RFC-P1）
+% 纯数学章，无源码；ch39/ch40 的工程讲解以本章公式编号为锚点。
+% 推导按 SmoothQuant / SVDQuant / TurboQuant / DVD-Quant 原论文逐条核对
+\chapter{SVDQuant（一）：从 SmoothQuant 到 SVDQuant 的数学原理}\label{ch:38}
+
+\section{本章导读}
+
+本部分进入全书最后一块量化主题：\textbf{残差量化与低秩残差修正}。
+第~\ref{ch:34}--\ref{ch:37}~章已经把两侧分别压到 FP8 与 FP4（$A_8B_8$ 与
+$A_4B_4$），回答的是"量化矩阵乘怎么算得快"；第~\ref{ch:27}--\ref{ch:33}~章
+（第六部分）把精度换速度的目标限定在 attention 算子内部。本部分换一个问题：
+\textbf{当 4 bit 的码点本身装不下某个权重或激活的分布时，怎么把装不下的部分
+搬到别处}。答案是三件配套的机制——通道缩放平滑把激活的持续通道异常值迁进
+权重、低秩分支把权重里的大奇异方向搬进 bf16、残差只留 4 bit 码，再叠上
+LoRA 融合让低秩分支近乎免费。对象是扩散模型里占比最大的\textbf{普通 Linear
+层}，且不需要量化感知训练（post-training 即可）。
+按惯例本部分开篇导语放在本章：三件事必须先讲清。
+
+\textbf{（1）符号方向}。SVDQuant 原文使用 $W\in\mathbb{R}^{m\times n}$ 与
+$Y=XW$；本书全篇采用 PyTorch 权重方向（与第~\ref{ch:27}~章一致）：
+\begin{equation}
+  X\in\mathbb{R}^{M\times K},\qquad
+  W\in\mathbb{R}^{N\times K},\qquad
+  Y=XW^{\top}\in\mathbb{R}^{M\times N}.
+  \label{eq:38-direction}
+\end{equation}
+一个必须提前交代的陷阱：原文的低秩因子 $L_1$ 是 down 投影、$L_2$ 是 up 投影；
+按式~\ref{eq:38-direction} 转置后角色对调，本书的 $L_1\in\mathbb{R}^{N\times r}$
+是 up 因子、$L_2\in\mathbb{R}^{r\times K}$ 是 down 因子。后文第~\ref{ch:39}--\ref{ch:40}~章代码里的
+\texttt{lora\_down}/\texttt{lora\_up} 命名与本书记号一致，但与论文原文
+交叉阅读时不能只换矩阵形状、不换因子角色。
+
+\textbf{（2）术语消歧}。本书已出现过两个"平滑"：第~\ref{ch:28}~章的
+smooth-K/smooth-V 利用 softmax 的\textbf{行平移不变性}与\textbf{行和恒为 1}，
+是不动网络输出的不变变换；本章的平滑（smoothing）是 SmoothQuant 意义的
+\textbf{逐输入通道对角缩放} $\widehat X=XS^{-1}$、$\widehat W=WS$，它改变参与
+量化的数值、不改变数学输出。两者除名字外没有共同数学结构，本章统一称
+\textbf{通道缩放平滑}。
+
+\textbf{（3）素材与验证方式}。本章是纯数学章，无源码区间；实现讲解拆成两章：
+第~\ref{ch:39}~章讲 cache-dit 的量化 producer（fuse LoRA-down 的激活量化），
+第~\ref{ch:40}~章讲 W4A4 GEMM（NVFP4 MMA 与 BF16 LoRA-up 融合）。源码锚定
+cache-dit commit \texttt{eced0158}，完整代码入口见附录~\ref{app:D}。
+\textbf{前置章节}：第~\ref{ch:27}~章（量化数学，必须）、第~\ref{ch:31}~章
+（NVFP4 格式与两级 scale，第~\ref{ch:39}~章直接复用其记号）、第~\ref{ch:34}~章
+（量化 GEMM 的误差模型）。预计篇幅：数学主线四节，扩展阅读两节。
+
+\section{问题与动机}
+
+\subsection{W4A4 要解决的矛盾}
+
+扩散模型推理的显存大头是 Linear 层权重。BF16 权重降到 4 bit，参数显存理论上
+缩小 4 倍；但权重变便宜的前提是激活也能便宜——推理框架希望把激活同样量化到
+4 bit，让 GEMM 的两端都吃低比特码，这就是 W4A4。麻烦在于：激活的数值分布比
+权重差得多。
+
+SmoothQuant 对 LLM 激活的观察（本书转述其 §2 的实验结论）是：激活异常值
+\textbf{持续出现在固定的少数输入通道}上，而不是随机散布在各 token。对
+per-tensor 对称量化，设第 $j$ 个输入通道在校准数据上的最大幅值为 $m_j$，
+整张量的最大幅值为 $m$，原文用下式估计该通道的有效量化级数：
+\begin{equation}
+  \text{effective levels}_j \approx 2^{b}\,\frac{m_j}{m},
+  \label{eq:38-levels}
+\end{equation}
+$b$ 为位宽。异常通道把 $m$ 抬高一个数量级后，普通通道的有效级数从数百掉到
+个位数，大部分元素被量化成同一个码点。第~\ref{ch:31}~章已经见过 fp4 的量化
+格点只有 8 个正码值，有效级数再打折后信息所剩无几。
+
+\subsection{为什么 per-token scale 救不了}
+
+最直接的修复是按行（per-token）取 scale：每行各自 absmax 归一，行内的幅值
+差异被步长吃掉。但式~\ref{eq:38-levels} 的分母换成行 absmax 后，同一行内
+通道之间的差异仍在——异常通道照常拉高整行的步长。真正对症的粒度是
+\textbf{逐输入通道} scale：每个通道一个归一系数，通道间不可比性被彻底拆掉。
+
+问题在于量化粒度也是数学问题。回顾第~\ref{ch:27}~章的 scale 消去：
+激活按 token、权重按输出通道时，scale 都挂在 GEMM 外面，
+$Y\approx\mathrm{diag}(\Delta_X)\,(\bar q_X\bar q_W^{\top})\,\mathrm{diag}(\Delta_W)$
+可以在矩阵乘之后统一回乘。逐输入通道 scale 挂在归约轴 $K$ 上：
+\begin{equation}
+  Y_{mn}=\sum_{k}X_{mk}W_{nk},
+  \label{eq:38-reduce}
+\end{equation}
+第 $k$ 项的缩放没法提到 $\sum$ 外面。SmoothQuant 的时代背景是传统 INT8 kernel
+不支持归约轴内部 scale；现代 group-wise W4A4 kernel 能在归约过程中按组乘
+scale，但组大小、布局和指令仍受硬件约束。\textbf{数学上可分解不等于现有 kernel
+可直接执行}，这句判断贯穿本部分三章。
+
+\section{数学原理}
+
+\subsection{符号、矩阵方向与量化器}\label{sec:38-notation}
+
+沿用式~\ref{eq:38-direction} 的方向。令 $s\in\mathbb{R}_{>0}^{K}$，
+$S=\mathrm{diag}(s)$。与第~\ref{ch:27}~章一致，区分三个对象：低比特码
+$\bar q$（存储）、量化步长 $\Delta$（标量或分组张量）、反量化张量
+$\mathcal Q(X)=\Delta\bar q$（与 $X$ 同形）。signed $b$-bit absmax 对称量化为
+\begin{equation}
+  q_{\max}=2^{b-1}-1,\qquad
+  \Delta_X=\frac{\max|X|}{q_{\max}},\qquad
+  \bar q_X=\mathrm{round}\!\left(\frac{X}{\Delta_X}\right),\qquad
+  \mathcal Q(X)=\Delta_X\bar q_X.
+  \label{eq:38-absmax}
+\end{equation}
+实际 kernel 还有 clamp、非均匀 FP4 码本、group scale 与不同舍入规则；
+\textbf{离线平滑因子 $s_j$ 与运行时量化步长 $\Delta$ 不是一回事}：前者是逐输入
+通道的离线重参数化，后者是量化器的动态或静态参数。第~\ref{ch:39}~章会看到
+cache-dit 的 producer 里两者同时出现，分别走不同的寄存器与存储路径。
+
+\subsection{SmoothQuant：逐通道等价迁移}\label{sec:38-smq}
+
+SmoothQuant 的变换是全精度代数中的严格恒等式，不是近似：
+\begin{equation}
+  Y=XW^{\top}=(XS^{-1})(WS)^{\top}=\widehat X\widehat W^{\top}.
+  \label{eq:38-smq-equiv}
+\end{equation}
+逐元素看，第 $j$ 个输入通道满足
+\begin{equation}
+  \widehat X_{ij}=\frac{X_{ij}}{s_j},\qquad
+  \widehat W_{nj}=s_jW_{nj},
+  \label{eq:38-smq-elem}
+\end{equation}
+即一个通道上的幅值在激活与权重之间按 $s_j$ 互相转移。误差只来自随后分别量化
+$\widehat X$ 和 $\widehat W$，变换本身不产生误差。工程上 $S^{-1}$ 可折入前一层，
+残差分支必须同步缩放，否则式~\ref{eq:38-smq-equiv} 的等价性被破坏。
+
+$s_j$ 怎么取？定义校准数据上的逐输入通道幅值与权重通道幅值：
+\begin{equation}
+  m_j^X=\max_{\text{calib},\,i}|X_{ij}|,\qquad
+  m_j^W=\max_{n}|W_{nj}|,
+  \label{eq:38-mj}
+\end{equation}
+SmoothQuant 取迁移强度 $\alpha\in[0,1]$：
+\begin{equation}
+  \boxed{\,s_j=\frac{(m_j^X)^{\alpha}}{(m_j^W)^{1-\alpha}}\,}
+  \label{eq:38-alpha}
+\end{equation}
+代入式~\ref{eq:38-smq-elem} 得两侧的逐通道最大幅值：
+\begin{equation}
+  \max|\widehat X_j|=\frac{m_j^X}{s_j}=(m_j^Xm_j^W)^{1-\alpha},\qquad
+  \max|\widehat W_j|=s_jm_j^W=(m_j^Xm_j^W)^{\alpha}.
+  \label{eq:38-split}
+\end{equation}
+两式相乘有
+\begin{equation}
+  \max|\widehat X_j|\cdot\max|\widehat W_j|=m_j^Xm_j^W,
+  \label{eq:38-product}
+\end{equation}
+与 $\alpha$ 无关——$\alpha$ 只是在对数域重新分配两侧的幅值范围。特别地，
+\begin{equation}
+  \alpha=\tfrac12
+  \;\Longrightarrow\;
+  \max|\widehat X_j|=\max|\widehat W_j|=\sqrt{m_j^Xm_j^W}.
+  \label{eq:38-half}
+\end{equation}
+所以 $\alpha=0.5$ 的精确含义是\textbf{两侧逐通道最大幅值相等}。它不是"量化误差
+各减少一半"，更不是理论最优点；两个端点可用来检查公式方向：$\alpha=1$ 时
+$s_j=m_j^X$，激活被完全归一、难度全部迁给权重；$\alpha=0$ 时 $s_j=1/m_j^W$，
+难度全部留在激活。原文报告多数模型在 $0.4$--$0.6$ 附近较稳，但 GLM-130B 用了
+$0.75$；正确做法是按模型、按层校准。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  panel/.style={draw=black!35, line width=0.3pt}]
+  % ============ (a) 原始 ============
+  % (a1) |X|：per-tensor 步长小，一根 outlier 冲出
+  \begin{scope}[xshift=0.5cm]
+    \fill[tkGreen!20] (0,0) rectangle (1.65,0.38);
+    \fill[tkRed!10]   (0,0.38) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \foreach \i in {0,...,29}{
+      \pgfmathsetmacro{\h}{0.07+0.11*abs(sin(\i*47.3+5))}
+      \fill[tkBlue!65] ({0.055*\i},0) rectangle ++(0.047,\h);
+    }
+    \fill[tkRed] ({0.055*6},0) rectangle ++(0.047,1.80);
+    \node[font=\tiny, anchor=north east] at (1.60,1.97) {10};
+    \node[font=\tiny, anchor=north east] at (1.60,0.10) {0};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {$|X|$};
+    \node[font=\tiny, text=tkRed, anchor=west] at (1.08,1.55) {outlier};
+    \draw[-{Stealth}, tkRed, thick] (1.06,1.55) -- (0.44,1.55);
+    \node[font=\tiny, text=tkRed, anchor=north] at (0.82,-0.16) {Very Hard};
+  \end{scope}
+  % (a2) |W|
+  \begin{scope}[xshift=2.45cm]
+    \fill[tkGreen!20] (0,0) rectangle (1.65,0.72);
+    \fill[tkRed!10]   (0,0.72) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \foreach \i in {0,...,29}{
+      \pgfmathsetmacro{\h}{0.42+0.20*abs(sin(\i*31.7+11))}
+      \fill[tkBlue!65] ({0.055*\i},0) rectangle ++(0.047,\h);
+    }
+    \foreach \i in {3,22}{
+      \fill[tkRed] ({0.055*\i},0) rectangle ++(0.047,1.40);
+    }
+    \node[font=\tiny, anchor=north east] at (1.60,1.97) {2};
+    \node[font=\tiny, anchor=north east] at (1.60,0.10) {0};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {$|W|$};
+    \node[font=\tiny, text=tkRed, anchor=north] at (0.82,-0.16) {Hard};
+  \end{scope}
+  % 迁移箭头 1
+  \draw[-{Stealth}, thick, tkOrange] (4.30,1.35) -- (5.05,1.35)
+    node[midway, below=1pt, font=\tiny, text=tkOrange] {$S$};
+  % ============ (b) 平滑后 ============
+  % (b1) |X̂|：整段落进绿区
+  \begin{scope}[xshift=5.05cm]
+    \fill[tkGreen!20] (0,0) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \foreach \i in {0,...,29}{
+      \pgfmathsetmacro{\h}{1.16+0.24*abs(sin(\i*29.3+7))}
+      \fill[tkGreen!65!black] ({0.055*\i},0) rectangle ++(0.047,\h);
+    }
+    \node[font=\tiny, anchor=north east] at (1.60,1.97) {2};
+    \node[font=\tiny, anchor=north east] at (1.60,0.10) {0};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {$|\widehat X|$};
+    \node[font=\tiny, text=tkGreen!45!black, anchor=north] at (0.82,-0.16) {Easy};
+  \end{scope}
+  % (b2) |Ŵ|：outlier 更尖
+  \begin{scope}[xshift=7.00cm]
+    \fill[tkGreen!20] (0,0) rectangle (1.65,0.72);
+    \fill[tkRed!10]   (0,0.72) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \foreach \i in {0,...,29}{
+      \pgfmathsetmacro{\h}{0.46+0.18*abs(sin(\i*37.9+13))}
+      \fill[tkBlue!65] ({0.055*\i},0) rectangle ++(0.047,\h);
+    }
+    \fill[tkRed] ({0.055*9},0) rectangle ++(0.047,1.80);
+    \node[font=\tiny, anchor=north east] at (1.60,1.97) {4.5};
+    \node[font=\tiny, anchor=north east] at (1.60,0.10) {0};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {$|\widehat W|$};
+    \node[font=\tiny, text=tkRed, anchor=north] at (0.82,-0.16) {Harder};
+  \end{scope}
+  % 迁移箭头 2
+  \draw[-{Stealth}, thick, tkOrange] (8.95,1.35) -- (9.70,1.35)
+    node[midway, below=1pt, font=\tiny, text=tkOrange] {$r{=}32$};
+  % ============ (c) SVDQuant ============
+  % (c1) |X̂| 同 (b1)
+  \begin{scope}[xshift=9.70cm]
+    \fill[tkGreen!20] (0,0) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \foreach \i in {0,...,29}{
+      \pgfmathsetmacro{\h}{1.16+0.24*abs(sin(\i*29.3+7))}
+      \fill[tkGreen!65!black] ({0.055*\i},0) rectangle ++(0.047,\h);
+    }
+    \node[font=\tiny, anchor=north east] at (1.60,1.97) {2};
+    \node[font=\tiny, anchor=north east] at (1.60,0.10) {0};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {$|\widehat X|$};
+    \node[font=\tiny, text=tkGreen!45!black, anchor=north] at (0.82,-0.16) {Easy};
+  \end{scope}
+  % (c2) |R|：无 outlier、幅值范围压缩
+  \begin{scope}[xshift=11.55cm]
+    \fill[tkGreen!20] (0,0) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \foreach \i in {0,...,29}{
+      \pgfmathsetmacro{\h}{1.02+0.22*abs(sin(\i*41.3+3))}
+      \fill[tkGreen!65!black] ({0.055*\i},0) rectangle ++(0.047,\h);
+    }
+    \node[font=\tiny, anchor=north east] at (1.60,1.97) {0.05};
+    \node[font=\tiny, anchor=north east] at (1.60,0.10) {0};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {$|R|$};
+    \node[font=\tiny, text=tkGreen!45!black, anchor=north] at (0.82,-0.16) {Easy};
+  \end{scope}
+  % (c3) 低秩分支：16-bit，无需量化
+  \begin{scope}[xshift=13.40cm]
+    \fill[tkPurple!12] (0,0) rectangle (1.65,2.0);
+    \draw[panel] (0,0) rectangle (1.65,2.0);
+    \filldraw[fill=tkPurple!35, draw=tkPurple] (0.25,1.15) -- (1.4,1.15)
+      -- (1.05,1.72) -- (0.6,1.72) -- cycle;
+    \filldraw[fill=tkPurple!55, draw=tkPurple] (0.6,0.28) -- (1.05,0.28)
+      -- (1.4,0.85) -- (0.25,0.85) -- cycle;
+    \node[font=\tiny] at (0.82,1.40) {$\boldsymbol{L_1}$};
+    \node[font=\tiny] at (0.82,0.57) {$\boldsymbol{L_2}$};
+    \node[font=\tiny, anchor=south] at (0.82,2.09) {16-bit};
+    \node[font=\tiny] at (0.82,1.0) {\textbf{+}};
+    \node[font=\tiny, text=tkGreen!45!black, anchor=north, align=center]
+      at (0.82,-0.16) {No Need to\\Quantize};
+  \end{scope}
+  % 段标题
+  \node[font=\small\bfseries, anchor=north] at (1.85,2.98) {(a) 原始};
+  \node[font=\small\bfseries, anchor=north] at (6.85,2.98) {(b) 平滑：难度迁到权重};
+  \node[font=\small\bfseries, anchor=north] at (12.25,2.98)
+    {(c) SVDQuant：难度交给低秩分支};
+  % 注记
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.80)
+    {柱高为逐通道幅值（示意，不按真实比例）；绿色背景是当前量化步长能覆盖的范围，
+     柱顶冲出绿区的通道就是 outlier（红色）。左起三组面板：(a) 激活与权重各自带
+     outlier，$|X|$ 的 per-tensor 量程被 outlier 抬到约 10、普通通道只剩个位数
+     有效量化级；(b) 平滑把激活的 outlier 压进绿区，代价是权重的 outlier 更尖
+     （y 轴从 2 抬到 4.5）；(c) SVD 把权重的尖峰整体搬进 16-bit 低秩分支，残差
+     $|R|$ 的幅值范围从 $|\widehat W|$ 的 4.5 压到 0.05，整段落回绿区。逐输入通道
+     scale 本可拆掉 (a) 的 outlier，但它落在 GEMM 归约轴 $K$ 上
+     （式~\ref{eq:38-reduce}），这正是平滑必须存在的理由。};
+\end{tikzpicture}
+\caption{量化难度在激活与权重之间的两次迁移（示意复刻 SVDQuant 论文的分布图）。
+(a) 两侧都难；(b) 平滑把难度搬到权重侧、激活归一；(c) SVD 把权重侧最难的尖峰
+交给 16-bit 低秩分支，只剩幅值范围极窄的残差落 4 bit。}
+\label{fig:38-smq-shift}
+\end{figure}
+
+\subsection{误差视角：为什么平滑到 4 bit 仍不够}\label{sec:38-error}
+
+平滑把量化难度从激活迁到了权重。定量地看，定义线性层量化误差
+\begin{equation}
+  E(X,W)=\bigl\|XW^{\top}-\mathcal Q(X)\mathcal Q(W)^{\top}\bigr\|_F.
+  \label{eq:38-exw}
+\end{equation}
+SVDQuant 的 Proposition 4.1（转述）给出对任意 $X,W$ 与任意反量化映射 $\mathcal Q$
+都成立的确定性上界：
+\begin{equation}
+  \boxed{
+  E(X,W)\le
+  \|X\|_F\,\|W-\mathcal Q(W)\|_F
+  +\|X-\mathcal Q(X)\|_F
+   \left(\|W\|_F+\|W-\mathcal Q(W)\|_F\right)}
+  \label{eq:38-prop41}
+\end{equation}
+证明只需插入中间项再用三角不等式与 Frobenius 范数次乘性
+$\|AB^{\top}\|_F\le\|A\|_F\|B\|_F$：
+\begin{align}
+  E(X,W)
+  &=\bigl\|X(W-\mathcal Q(W))^{\top}+(X-\mathcal Q(X))\mathcal Q(W)^{\top}\bigr\|_F \notag\\
+  &\le\|X\|_F\|W-\mathcal Q(W)\|_F+\|X-\mathcal Q(X)\|_F\,\|\mathcal Q(W)\|_F,
+  \label{eq:38-prop41-pf}
+\end{align}
+最后一步代入
+$\|\mathcal Q(W)\|_F=\|W-(W-\mathcal Q(W))\|_F\le\|W\|_F+\|W-\mathcal Q(W)\|_F$。
+它是弱上界，不是误差等式；但它把结构讲得很清楚：总误差由
+\textbf{权重量化项}与\textbf{激活量化项}相加，且激活项的系数里含
+$\|W\|_F$。
+
+把 $X,W$ 换成平滑后的 $\widehat X,\widehat W$：激活侧
+$\|\widehat X-\mathcal Q(\widehat X)\|_F$ 因通道归一而下降，但权重项
+\begin{equation}
+  \|\widehat X\|_F\,\|\widehat W-\mathcal Q(\widehat W)\|_F
+  \label{eq:38-wterm}
+\end{equation}
+可能上升——$\widehat W$ 的异常通道幅值被 $s_j$ 放大（图~\ref{fig:38-smq-shift}
+的 (b) 段右面板：$|\widehat W|$ 的尖峰比 (a) 段的 $|W|$ 更高），而
+$\|\widehat X\|_F$ 并不守恒（其平方为 $\sum_j\|X_{:,j}\|_2^2/s_j^2$）；
+它是否足以抵消权重项的增长取决于具体层。
+W8A8 里权重还有 256 个码点，多出的幅值余量吸收得起；W4A4 里权重只有
+8 个正码值（e2m1），权重侧自己的异常值同样会拉大量化步长，式~\ref{eq:38-wterm}
+成为主导项。这解释了 SVDQuant 的下一步：\textbf{不是继续加大 $\alpha$ 把难度
+全推给某一边，而是把平滑后权重里难以由 4 bit 表达的部分，整体转移到一个
+高精度的低秩分支上}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+  \draw[->, thick] (0,0) -- (10.8,0) node[anchor=west, font=\tiny]
+    {迁移强度 $\alpha$};
+  \draw[->, thick] (0,0) -- (0,3.3);
+  \node[anchor=south, font=\tiny] at (0.35,3.22) {误差（示意）};
+  % 激活项：随 alpha 递减
+  \draw[thick, tkGreen!65!black] plot[smooth, tension=0.6]
+    coordinates {(0.2,2.7) (3,1.95) (6,1.15) (9.8,0.5)};
+  \node[font=\tiny, text=tkGreen!55!black, anchor=west] at (7.7,1.05) {激活项};
+  % 权重项（W4A4）：随 alpha 递增
+  \draw[thick, tkRed] plot[smooth, tension=0.6]
+    coordinates {(0.2,0.4) (3,1.05) (6,1.75) (9.8,2.55)};
+  \node[font=\tiny, text=tkRed, anchor=west] at (7.6,2.72) {权重项（W4A4）};
+  % 权重项（W8A8）：低而平
+  \draw[thick, dashed, tkRed!50] plot[smooth, tension=0.6]
+    coordinates {(0.2,0.22) (5,0.42) (9.8,0.8)};
+  \node[font=\tiny, text=tkRed!65, anchor=west] at (6.4,0.30) {权重项（W8A8）};
+  % 总误差：U 形
+  \draw[very thick, tkBlue] plot[smooth, tension=0.55]
+    coordinates {(0.2,2.95) (2.4,2.25) (5,1.98) (7.6,2.18) (9.8,2.75)};
+  \node[font=\tiny, text=tkBlue, anchor=south west] at (5.15,1.95) {总误差};
+  \draw[dashed] (5,0.02) -- (5,1.92);
+  \foreach \x/\t/\a in {0.2/{$\alpha{=}0$}/north, 5/{$\alpha{=}0.5$}/north, 9.8/{$\alpha{=}1$}/north}
+    \node[font=\tiny, anchor=\a] at (\x,-0.05) {\t};
+  \node[anchor=north west, align=left, text width=15.6cm, font=\tiny] at (0,-0.95)
+    {曲线形状为示意：由式~\ref{eq:38-prop41} 的上界与两组量化器的有效级数定性画出。
+     图中把总误差极小值画在 $\alpha\approx0.5$ 附近，实际极小位置仍按层校准；
+     极小值的高度由权重项决定——W8A8 时
+     权重项（虚线）压得很低，极小值足够小；W4A4 时权重项（实线）抬头，无论 $\alpha$
+     取多少都压不到可用水平。低秩分支要解决的正是这条实线（\ref{sec:38-svdq}~节）。};
+\end{tikzpicture}
+\caption{平滑后的误差再分配。$\alpha$ 把量化难度在激活项与权重项之间搬移；
+W4A4 抬高的是权重项那条曲线，因此调整 $\alpha$ 无法消除误差下限。}
+\label{fig:38-error-split}
+\end{figure}
+
+\subsection{SVDQuant：高精度低秩分支加低比特残差}\label{sec:38-svdq}
+
+对平滑后权重做秩 $r$ 分解：
+\begin{equation}
+  \widehat W=L_1L_2+R,\qquad
+  L_1\in\mathbb{R}^{N\times r},\quad
+  L_2\in\mathbb{R}^{r\times K},\quad
+  r\ll\min(N,K).
+  \label{eq:38-decomp}
+\end{equation}
+代入式~\ref{eq:38-smq-equiv}，前两步是恒等式：
+\begin{equation}
+  Y=XW^{\top}
+   =\widehat X\widehat W^{\top}
+   =\underbrace{\widehat XL_2^{\top}L_1^{\top}}_{\text{16-bit 低秩分支}}
+   +\underbrace{\widehat XR^{\top}}_{\text{残差分支}}.
+  \label{eq:38-branch}
+\end{equation}
+SVDQuant 只把残差分支替换成 W4A4：
+\begin{equation}
+  \boxed{
+  Y\approx
+  \widehat XL_2^{\top}L_1^{\top}
+  +\mathcal Q(\widehat X)\,\mathcal Q(R)^{\top}}
+  \label{eq:38-svdq}
+\end{equation}
+前两行是代数恒等式，只有最后的 $\mathcal Q$ 是近似。于是量化输出误差精确地
+坍缩成残差分支的误差：
+\begin{equation}
+  \bigl\|\widehat X\widehat W^{\top}-\widehat XL_2^{\top}L_1^{\top}
+        -\mathcal Q(\widehat X)\mathcal Q(R)^{\top}\bigr\|_F
+  =\bigl\|\widehat XR^{\top}-\mathcal Q(\widehat X)\mathcal Q(R)^{\top}\bigr\|_F
+  =E(\widehat X,R).
+  \label{eq:38-residual-only}
+\end{equation}
+因为 $\widehat X$ 已平滑，设计目标进一步集中为：让 $\|R\|_F$ 与
+$\|R-\mathcal Q(R)\|_F$ 都尽可能小——大幅值方向由 16-bit 低秩分支免费
+（相对 4 bit 而言）承接，4-bit 码只面对一个幅值紧凑的残差。
+
+\textbf{低秩分支的代价}。两次低秩 GEMM 的乘加量相对原 GEMM 的比例为
+\begin{equation}
+  \frac{MKr+MrN}{MKN}=\frac{r(K+N)}{KN},
+  \label{eq:38-flops}
+\end{equation}
+与低秩参数占权重参数的比例相同。论文的经验取值是 $r\in\{16,32\}$
+（$r\ll\min(N,K)$），取 $K=N=3072$、$r=32$ 时乘加量约占 $2.08\%$。
+$r=32$ 不是玄学：论文 Fig.~5 观测到平滑后权重的前 32 个奇异值明显陡降、
+其余平缓，截断点落在"肘部"（图~\ref{fig:38-tail} 画的是同一现象）。也要
+注意这只是乘加量（未计位宽差）的比例，不是打包字节比例，更不是延迟比例：
+小秩 GEMM 的额外输入读取、输出写入和 kernel launch 完全可能主导实际开销
+（第~\ref{ch:40}~章性能节会给出融合前后的实测对比）。
+
+\textbf{残差范数如何进入误差上界}。SVDQuant Proposition 4.2 的场景要限定死：
+对含 $\mathcal N$ 个元素的单张量 $R$ 用\textbf{单一} absmax scale、
+round-to-nearest、且存在常数 $c$ 使分布满足
+$\mathbb E[\max|R|]\le c\,\mathbb E[\|R\|_F]$（正则性条件），则
+\begin{equation}
+  \mathbb E\|R-\mathcal Q(R)\|_F
+  \le\frac{c\sqrt{\mathcal N}}{q_{\max}}\,\mathbb E\|R\|_F.
+  \label{eq:38-prop42}
+\end{equation}
+推导：由 $\mathcal Q(R)=\Delta_R\mathrm{round}(R/\Delta_R)$ 与每元素不超过
+一个 LSB 的宽松估计，
+$\|R-\mathcal Q(R)\|_F\le\Delta_R\sqrt{\mathcal N}
+=\frac{\sqrt{\mathcal N}}{q_{\max}}\max|R|$；两边取期望代入正则性条件即得。
+若 $R$ 的元素服从正态分布，论文取
+$c=\sqrt{\pi\log\mathcal N/\mathcal N}$（$\mathcal N=\text{size}(R)$）。
+注意 $c$ 不是常数而是随张量大小缓慢变化的量，这也是"上界只给趋势、
+不给具体误差"的原因之一。适用边界必须
+原样保留：per-group scale 要按组重新分析；GPTQ 的误差反馈使 $\mathcal Q(R)$
+不再是逐元素舍入结果，不能直接套；$c$ 依赖分布，改 rank 同时改变 $\|R\|_F$
+与残差分布，不保证上界严格单调。
+
+\textbf{Eckart--Young 与不能过度声称的部分}。对精确 SVD
+$\widehat W=U\Sigma V^{\top}$ 取前 $r$ 个奇异三元组
+$L_1=U_r\Sigma_r$、$L_2=V_r^{\top}$，Eckart--Young--Mirsky 定理给出
+\begin{equation}
+  \|R\|_F=\|\widehat W-L_1L_2\|_F=\sqrt{\sum_{i=r+1}^{\min(N,K)}\sigma_i^2},
+  \label{eq:38-tail}
+\end{equation}
+即\textbf{尾奇异值平方和开根}（不是奇异值的几何平均）。它只保证无权
+Frobenius 意义下的最优 rank-$r$ 近似；不能进一步
+声称"SVD 使量化误差最小"，原因有三层：真实层输出误差是激活加权的
+$\|\widehat X(\widehat W-L)^{\top}\|_F$；式~\ref{eq:38-prop42} 只是上界且常数
+依赖分布；group scale、GPTQ、低精度累加都不在定理目标内。另外尾谱恒等式
+只对\textbf{精确截断 SVD 的初始分解}成立——随机化近似 SVD 或 refine 之后，
+$\|R\|_F$ 不再是原矩阵的尾奇异值和。图~\ref{fig:38-tail} 把这条恒等式与
+"为什么先量化再用低秩补偿量化误差的收益有限"画在一起。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+  \draw[->, thick] (0,0) -- (12.6,0) node[anchor=west, font=\tiny]
+    {奇异值序号 $i$（前 64 个）};
+  \draw[->, thick] (0,0) -- (0,3.4) node[anchor=south, font=\tiny]
+    {$\sigma_i$（示意）};
+  % 尾谱区
+  \fill[tkOrange!10] (6.0,0) rectangle (12.4,3.25);
+  % 原始权重 W：平缓衰减
+  \draw[thick, tkBlue!65] plot[smooth, tension=0.5]
+    coordinates {(0.3,2.55) (2,2.3) (4,2.12) (6,1.96) (8,1.82) (10,1.70) (12,1.60)};
+  \node[font=\tiny, text=tkBlue!65, anchor=south] at (10.6,1.72) {$W$};
+  % 平滑后权重 Ŵ：前 32 陡降
+  \draw[very thick, tkOrange] plot[smooth, tension=0.5]
+    coordinates {(0.3,3.10) (1,2.75) (2,2.30) (3,1.72) (4,1.15) (5,0.70)
+                 (6,0.50) (7,0.44) (8,0.40) (9,0.36) (10,0.32) (11,0.29) (12,0.26)};
+  \node[font=\tiny, text=tkOrange, anchor=south west] at (0.4,3.12) {$\widehat W$};
+  % 残差 R：整体很低
+  \draw[thick, tkGreen!55!black] plot[smooth, tension=0.5]
+    coordinates {(0.3,0.09) (2,0.08) (4,0.07) (6,0.06) (8,0.05) (10,0.04) (12,0.032)};
+  \node[font=\tiny, text=tkGreen!45!black, anchor=north west] at (6.6,0.095)
+    {$R=\widehat W-L_1L_2$};
+  % 截断位置 r=32（x=6 对应第 32 个）
+  \draw[dashed, very thick, tkRed] (6.0,0) -- (6.0,3.3)
+    node[anchor=south, font=\tiny, text=tkRed] {$r{=}32$};
+  \node[font=\tiny, text=tkOrange!70!black, align=center] at (9.6,2.9)
+    {尾谱：$\|R\|_F=\sqrt{\sum_{i>r}\sigma_i^{2}}$};
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.85)
+    {曲线为示意（对应论文 Fig.~5 的实测形态）。原始权重 $W$ 的奇异值本就不均衡；
+     平滑之后 $\widehat W$ 的前 32 个奇异值出现明显陡降、其余平缓，截断点就落在
+     这个"肘部"（$r=32$ 的经验来源）。去掉主导奇异值后，残差 $R$ 的谱整条压到
+     很低——$\|R\|_F$ 由式~\ref{eq:38-tail} 只剩尾谱能量。反过来若先量化、再用
+     低秩去补偿量化误差，面对的是一条平坦的谱，低秩只能砍掉很小的能量，所以
+     "先平滑、再 SVD、最后量化"的顺序不可交换。};
+\end{tikzpicture}
+\caption{三条奇异值谱的对比（复刻论文 Fig.~5 的读数方式）。$W$ 平缓、$\widehat W$
+前 32 个陡降、$R$ 整体压到很低；$r=32$ 取在肘部。}
+\label{fig:38-tail}
+\end{figure}
+
+\textbf{迭代 refine}。初始 SVD 后论文继续迭代。记 $\mathcal P_r(Z)$ 为秩 $r$
+截断分解，一种等价表述是
+\begin{equation}
+  R^{(t)}=\widehat W-L^{(t)},\qquad
+  Z^{(t)}=\widehat W-\mathcal Q(R^{(t)}),\qquad
+  L^{(t+1)}=\mathcal P_r(Z^{(t)}),\qquad
+  R^{(t+1)}=\widehat W-L^{(t+1)}.
+  \label{eq:38-refine}
+\end{equation}
+关键是最后的残差\textbf{始终相对原始 $\widehat W$ 重新锚定}，而不是相对
+$Z^{(t)}$；否则量化误差会被重复扣除。运行时计算的是
+$L^{(t+1)}+\mathcal Q(R^{(t+1)})$。论文的做法是迭代固定的小轮数，然后
+\textbf{取误差最小的那一轮}作为最终权重——因为每轮都从 $\widehat W$ 重新
+锚定，各轮结果互不污染，直接挑最优即可（不需要"最后一轮一定更好"的假设）。
+这说明"闭式 SVD 就是完整 SVDQuant"并不准确：refine 让低秩分支进一步吸收
+残差量化留下的误差结构。
+
+\textbf{顺序的意义}。先平滑，把激活的持续通道异常值迁入权重，使高精度低秩
+分支有机会同时承接两侧的量化难度；再 SVD，提取平滑后权重的主导奇异方向，
+让残差幅值范围收窄；最后量化，只对 $R$ 与 $\widehat X$ 落 4 bit（可再叠
+GPTQ 或 refine）。这与"先量化、再用低秩补偿量化误差"的 LoRC 路线不同：
+量化误差的奇异值谱较平，低秩近似抓不住；平滑后权重的主奇异方向集中，
+低秩才有效。低秩分支也不等于 LoRA：前者服务量化重构，后者服务任务适配，
+只是两者可以共享融合 kernel 的骨架（第~\ref{ch:40}~章）。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  stagebox/.style={draw, rounded corners=3pt, align=left, inner sep=4pt,
+                   text width=6.6cm, minimum height=2.1cm},
+  arr/.style={->, thick}]
+  % 离线阶段
+  \node[stagebox, fill=tkPurple!10] (off) at (4.1,4.7)
+    {\textbf{离线（量化期一次，第~\ref{ch:39}~章的打包侧）}\\[2pt]
+     $W\xrightarrow{\ \times S\ }$ 通道缩放平滑 $\to$ SVD + refine\\
+     $\Rightarrow\ L_1\ (N{\times}r)$ bf16 up、$L_2\ (r{\times}K)$ bf16 down\\
+     $\Rightarrow\ R=\widehat W-L_1L_2\ \to$ 4-bit 量化（RTN/GPTQ）};
+  % 在线阶段
+  \node[stagebox, fill=tkOrange!10] (on) at (4.1,1.9)
+    {\textbf{在线（每个 forward，第~\ref{ch:39}~章的 producer）}\\[2pt]
+     $X\xrightarrow{\ \times S^{-1}\ }$ 平滑 $\to$ NVFP4 量化\\
+     $\Rightarrow\ \mathcal Q(\widehat X)$：e2m1 码 + native pack SFA\\
+     $\Rightarrow\ D=\widehat XL_2^{\top}$（低秩 down，寄存器累加）};
+  % 融合 GEMM
+  \node[stagebox, fill=tkGreen!14, text width=5.0cm, minimum height=2.7cm] (gemm) at (12.4,3.3)
+    {\textbf{一个 kernel、一个 FP32 accumulator}\\[2pt]
+     $\mathcal Q(\widehat X)\mathcal Q(R)^{\top}$（NVFP4 MMA）\\
+     $+\ DL_1^{\top}$（BF16 LoRA-up MMA）\\
+     $\to\ \mathrm{BF16}\bigl(s\,P+L+\mathrm{bias}\bigr)$};
+  \node[stagebox, fill=tkFillGreen, text width=5.0cm, minimum height=0.7cm,
+        align=center] (y) at (12.4,1.35) {$Y$（bf16，单次舍入）};
+  \draw[arr] (off.east) -- (gemm.north west)
+    node[midway, above, font=\tiny, align=center] {$L_1$（up）\\$R$（4-bit）};
+  \draw[arr] (on.east) -- (gemm.south west)
+    node[midway, below, font=\tiny, align=center] {$\mathcal Q(\widehat X)$\\$D$};
+  \draw[arr] (gemm) -- (y);
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0.1,-0.15)
+    {与式~\ref{eq:38-svdq} 逐项对应：上排产出式~\ref{eq:38-decomp} 的 $L_1,L_2,R$；
+     下排即第~\ref{ch:39}~章 producer 的三样输出（qact/ascales/$D$）；右侧是
+     第~\ref{ch:40}~章的融合 kernel，两个 MMA 共享同一 FP32 accumulator，
+     \texttt{alpha}/wcscales 只乘 NVFP4 主积。};
+\end{tikzpicture}
+\caption{SVDQuant 数据流总览。离线：$W$ 经通道缩放平滑后做 SVD（可 refine），
+$L_1,L_2$ 保留 bf16，残差 $R$ 单独量化到 4 bit。在线：producer 对 $\widehat X$
+做 NVFP4 量化并顺手算出 $D=\widehat XL_2^{\top}$（第~\ref{ch:39}~章）；
+W4A4 GEMM 与 $DL_1^{\top}$ 融合成一个 kernel（第~\ref{ch:40}~章）。}
+\label{fig:38-svdq-flow}
+\end{figure}
+
+\section{扩展阅读：TurboQuant}\label{sec:38-turbo}
+
+TurboQuant（arXiv:2504.19874）处理单位向量
+$x\in\mathbb S^{d-1}$ 的存储与内积估计，主要面向 KV cache 与最近邻检索。
+它不是 W4A4 Linear 的权重量化算法，而是一套\textbf{数据无关的随机向量量化}：
+先固定随机旋转与码本，随后对任意输入向量直接编码，不需要校准数据集。
+本节关心它如何把“任意方向的向量”变成可预先求解的一维量化问题，以及为什么
+重构误差最小还不能保证内积估计无偏。
+
+\subsection{问题定义：重构 MSE 与内积失真是两个目标}
+
+设量化器输出 $B=bd$ 个二进制位，$b$ 是平均每坐标位数，重建向量为
+$\widetilde x=Q^{-1}(Q(x))$。对固定的 $x,y$，期望只对量化器自身的随机性取：
+\begin{equation}
+  D_{mse}=\mathbb E_Q\|x-\widetilde x\|_2^2,\qquad
+  D_{prod}=\mathbb E_Q\bigl(\langle y,x\rangle-
+  \langle y,\widetilde x\rangle\bigr)^2.
+  \label{eq:38-tq-objectives}
+\end{equation}
+内积版本还额外要求
+$\mathbb E_Q\langle y,\widetilde x\rangle=\langle y,x\rangle$。
+这里 $y$ 是全精度查询向量，只有数据库侧或 KV cache 侧的 $x$ 被压缩。
+单位范数不是功能限制：若 $\|x\|_2\ne1$，先保存 $\gamma_x=\|x\|_2$，
+量化 $x/\gamma_x$，读取时再乘回 $\gamma_x$。这个标量与后面的 QJL 残差范数
+都属于额外存储，不能只按 $bd$ bit 估算端到端压缩率。
+
+\subsection{随机旋转：把任意输入变成已知坐标分布}
+
+取 Haar 随机正交阵 $\Pi\in\mathbb R^{d\times d}$，计算 $z=\Pi x$。
+对任意固定的单位向量 $x$，$z$ 都在单位球面上均匀分布；这正是“无需校准”的
+来源：输入方向再特殊，旋转后的坐标分布也不再依赖它。任一坐标 $Z=Z_j$ 的
+精确密度为
+\begin{equation}
+  f_Z(z)=\frac{\Gamma(d/2)}{\sqrt\pi\,\Gamma((d-1)/2)}
+  (1-z^2)^{(d-3)/2},\qquad -1\le z\le1,
+  \label{eq:38-tq-beta}
+\end{equation}
+并且 $\mathbb E[Z]=0$、$\operatorname{Var}(Z)=1/d$。高维时可用
+$\mathcal N(0,1/d)$ 近似。不同坐标在有限维下受 $\sum_jZ_j^2=1$ 约束，
+\textbf{并不严格独立}；“近独立”是高维渐近性质。后文把总 MSE 写成各坐标
+误差之和只需要期望的线性与同分布，不需要独立性；近独立主要用于解释为什么
+逐坐标标量量化能接近向量量化的信息论极限。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt,
+              text width=3.8cm, minimum height=1.35cm},
+  arr/.style={->, thick}]
+  \node[box, fill=tkFillBlue] (x) at (2.2,4.5)
+    {任意固定 $x$\\$\|x\|_2=1$，方向可任意差};
+  \node[box, fill=tkOrange!22] (rot) at (7.4,4.5)
+    {Haar 旋转 $z=\Pi x$\\$z$ 在球面上均匀};
+  \node[box, fill=tkGreen!22] (dist) at (12.6,4.5)
+    {坐标分布固定\\Beta $\to\mathcal N(0,1/d)$};
+  \draw[arr] (x) -- (rot);
+  \draw[arr] (rot) -- (dist);
+  \node[font=\tiny, anchor=north] at (2.2,3.55) {不需要校准集};
+  \node[font=\tiny, anchor=north] at (7.4,3.55) {正交变换保持范数};
+  \node[font=\tiny, anchor=north] at (12.6,3.55) {所有坐标共用码本};
+
+  \node[font=\tiny, anchor=west] at (0.0,2.65) {(a) 单坐标密度（高维近似，示意）};
+  \draw[->] (0.4,0.25) -- (0.4,2.35);
+  \draw[->] (0.4,0.25) -- (6.2,0.25) node[anchor=west, font=\tiny] {$z$};
+  \draw[thick, tkBlue] plot[smooth, tension=0.65] coordinates
+    {(0.65,0.32) (1.4,0.55) (2.2,1.25) (3.0,2.12)
+     (3.8,1.25) (4.6,0.55) (5.4,0.32)};
+  \draw[dashed] (3.0,0.25) -- (3.0,2.12);
+  \node[font=\tiny, anchor=north] at (3.0,0.18) {$0$};
+  \node[font=\tiny, text=tkBlue!70!black] at (4.55,1.55) {$\mathcal N(0,1/d)$};
+
+  \node[font=\tiny, anchor=west] at (7.2,2.65) {(b) 对称 Lloyd--Max 码点};
+  \draw[->] (7.4,1.45) -- (15.1,1.45);
+  \foreach \x/\lab in {8.2/{$-c$}, 13.8/{$+c$}}{
+    \draw[tkOrange, very thick] (\x,1.25) -- (\x,1.65);
+    \node[font=\tiny, anchor=south] at (\x,1.67) {\lab};
+  }
+  \draw[dashed] (11.0,1.10) -- (11.0,1.82);
+  \node[font=\tiny, anchor=north] at (11.0,1.05) {$\tau=0$};
+  \node[font=\tiny, anchor=west] at (7.4,0.62)
+    {$b=1$：$c=\sqrt{2/(\pi d)}$，两个区间、两个码点};
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.15)
+    {旋转把“输入任意性”转移到共享随机阵 $\Pi$ 上。对每个坐标只需按已知密度
+     求最近码点；读取时先查表得到 $\widetilde z$，再算 $\Pi^{\top}\widetilde z$。
+     码本与 $\Pi$ 可由整组向量共享，不是每个向量各存一份。};
+\end{tikzpicture}
+\caption{TurboQuant 的随机旋转与逐坐标量化。任意单位向量经 Haar 旋转后具有
+相同坐标分布，因而可离线预求一维码本；图中密度曲线仅作形状示意。}
+\label{fig:38-tq-rotation}
+\end{figure}
+
+\subsection{Lloyd--Max 码本：一维连续 k-means}
+
+设 $b$ bit 码本有 $L=2^b$ 个有序码点 $c_1<\cdots<c_L$，区间边界为
+$\tau_0=-1$、$\tau_L=1$、$\tau_i=(c_i+c_{i+1})/2$。最近邻编码把
+$z\in[\tau_{i-1},\tau_i)$ 映射到 $c_i$。最优标量码本最小化
+\begin{equation}
+  \mathcal C(f_Z,b)=
+  \min_{c_1,\ldots,c_L}\sum_{i=1}^{L}
+  \int_{\tau_{i-1}}^{\tau_i}(z-c_i)^2f_Z(z)\,\mathrm dz.
+  \label{eq:38-tq-lloyd-cost}
+\end{equation}
+对码点求导得到两个交替更新条件：
+\begin{equation}
+  \tau_i=\frac{c_i+c_{i+1}}2,\qquad
+  c_i=\mathbb E[Z\mid Z\in(\tau_{i-1},\tau_i)]
+      =\frac{\int_{\tau_{i-1}}^{\tau_i}z f_Z(z)\,\mathrm dz}
+             {\int_{\tau_{i-1}}^{\tau_i}  f_Z(z)\,\mathrm dz}.
+  \label{eq:38-tq-lloyd-update}
+\end{equation}
+第一式选择最近码点，第二式把码点移到本区间质心；反复执行直到失真收敛。
+由于 $f_Z$ 只依赖维度与位宽，码本可离线计算一次并全局复用。高维近似下，
+论文给出的两组对称码点是
+\begin{equation}
+  b=1:\ c_\pm=\pm\sqrt{\frac{2}{\pi d}},\qquad
+  b=2:\ c\in\left\{\pm\frac{0.453}{\sqrt d},
+                    \pm\frac{1.51}{\sqrt d}\right\}.
+  \label{eq:38-tq-codebooks}
+\end{equation}
+
+编码过程只有三步：$z=\Pi x$；每坐标查最近码点并保存 $b$-bit 索引；
+读取时查表得 $\widetilde z$，再算 $\widetilde x=\Pi^{\top}\widetilde z$。
+正交性给出 $\|x-\widetilde x\|_2^2=\|z-\widetilde z\|_2^2$，所以
+\begin{equation}
+  D_{mse}=\sum_{j=1}^{d}\mathbb E|Z_j-\widetilde Z_j|^2
+  =d\,\mathcal C(f_Z,b).
+  \label{eq:38-tq-mse-identity}
+\end{equation}
+这条等式解释了为什么一个一维码本可以直接控制整个向量的重构误差。
+
+\subsection{MSE 上界与信息论下界}
+
+小位宽可数值求解式~\ref{eq:38-tq-lloyd-cost}；大位宽则用
+Panter--Dite 高分辨率近似：
+\begin{equation}
+  \mathcal C(f_Z,b)\le\frac1{12}
+  \left(\int f_Z(z)^{1/3}\,\mathrm dz\right)^3 4^{-b}
+  \approx\frac{\sqrt3\,\pi}{2d}\,4^{-b}.
+  \label{eq:38-tq-panter}
+\end{equation}
+以高维正态近似为例，代入
+$f_Z(z)=\sqrt{d/(2\pi)}\exp(-dz^2/2)$，有
+$\int f_Z^{1/3}\mathrm dz=(d/(2\pi))^{1/6}\sqrt{6\pi/d}$；
+立方后再除以 12 正好得到 $\sqrt3\pi/(2d)$。注意根号只覆盖 3，
+常数是 $\sqrt3\,\pi/2\approx2.7207$，不是 $\sqrt{3\pi}/2$。
+结合式~\ref{eq:38-tq-mse-identity} 与 Shannon lower bound，论文得到
+\begin{equation}
+  4^{-b}\le D_{mse}\le\frac{\sqrt3\,\pi}{2}\,4^{-b}.
+  \label{eq:38-tq-mse-bounds}
+\end{equation}
+因此上界与信息论下界只差常数因子 $2.7207$，而随 $b$ 增加的衰减速率都是
+$4^{-b}$。这里的“近优”指失真率量级，不是说每个有限维码本都达到全局最优。
+
+\subsection{为什么 MSE 最优仍会有内积偏置}
+
+用 $b=1$ 可以直接算出这个问题。由对称正态分布的条件均值，
+$c_+=\mathbb E[Z\mid Z>0]=\sqrt{2/(\pi d)}$。单坐标失真为
+\begin{equation}
+  \mathbb E[(Z-c_{\operatorname{sign}(Z)})^2]
+  =\mathbb E[Z^2]-c_+^2=\frac1d\left(1-\frac2\pi\right),
+  \label{eq:38-tq-1bit-mse}
+\end{equation}
+故向量 MSE 为 $1-2/\pi\approx0.3634$。但对内积估计，1-bit 重建是
+$\widetilde x=c_+\Pi^{\top}\operatorname{sign}(\Pi x)$。
+利用旋转不变性以及高维近似 $\mathbb E|Z_1|\approx c_+$，论文得到
+\begin{equation}
+  \mathbb E_\Pi\langle y,\widetilde x\rangle
+  =c_+d\,\mathbb E|Z_1|\,\langle y,x\rangle
+  \approx d c_+^2\langle y,x\rangle
+  =\frac2\pi\langle y,x\rangle.
+  \label{eq:38-tq-bias}
+\end{equation}
+也就是说，条件均值码点让“向量离原向量最近”，却让内积系统性地缩小到
+$2/\pi$。偏置不是舍入 bug，而是优化目标不同：MSE 只约束重建位置，
+不约束重建方向与查询向量的协方差。
+
+\subsection{QJL：用随机符号投影构造无偏内积估计}
+
+Quantized Johnson--Lindenstrauss（QJL）取随机矩阵
+$S\in\mathbb R^{d\times d}$，各元素独立服从 $\mathcal N(0,1)$，定义
+\begin{equation}
+  Q_{qjl}(u)=\operatorname{sign}(Su),\qquad
+  Q_{qjl}^{-1}(v)=\frac{\sqrt{\pi/2}}dS^{\top}v.
+  \label{eq:38-tq-qjl}
+\end{equation}
+对单位向量 $u$，每一行 $s_i$ 满足
+$\mathbb E[s_i\operatorname{sign}(s_i^{\top}u)]=\sqrt{2/\pi}\,u$。
+对 $d$ 行求和，前面的 $1/d$ 正好消去行数，因此
+$\mathbb E[Q_{qjl}^{-1}(Q_{qjl}(u))]=u$，对任意查询 $y$ 都有内积无偏性。
+再写成一个查询估计量：
+\begin{equation}
+  \widehat I_y=\frac1d\sum_{i=1}^{d}\sqrt{\pi/2}\,
+  (s_i^{\top}y)\operatorname{sign}(s_i^{\top}u),\qquad
+  \operatorname{Var}(\widehat I_y)
+  \le\frac{\pi}{2d}\|y\|_2^2.
+  \label{eq:38-tq-qjl-var}
+\end{equation}
+证明方差界只需注意求和项相互独立，并用
+$\operatorname{Var}(Z)\le\mathbb E[Z^2]$ 与
+$\mathbb E[(s_i^{\top}y)^2]=\|y\|_2^2$。QJL 的码只有每坐标一个符号位，
+它不追求最小向量 MSE；它服务的是无偏内积估计。
+
+\subsection{两阶段 TurboQuant：MSE 主项加 QJL 残差项}
+
+最终算法先把总预算拆成 $b-1$ bit 的 Lloyd--Max 主项和 1 bit 的 QJL 残差项。
+令主项重建为 $\widetilde x_{mse}$，残差及其范数为
+\begin{equation}
+  r=x-\widetilde x_{mse},\qquad \gamma=\|r\|_2.
+  \label{eq:38-tq-residual}
+\end{equation}
+存储 $(\mathrm{idx},\operatorname{sign}(Sr),\gamma)$，重建为
+\begin{equation}
+  \widetilde x=\widetilde x_{mse}+
+  \gamma\frac{\sqrt{\pi/2}}dS^{\top}\operatorname{sign}(Sr).
+  \label{eq:38-tq-two-stage}
+\end{equation}
+当 $r\ne0$ 时，$\operatorname{sign}(Sr)=
+\operatorname{sign}(S(r/\gamma))$，所以 QJL 实际作用于单位残差方向，
+$\gamma$ 负责恢复长度；$r=0$ 时令残差修正项为 0。条件于第一阶段，
+QJL 的无偏性给出
+$\mathbb E[\widetilde x\mid\widetilde x_{mse}]
+=\widetilde x_{mse}+r=x$；再用全期望公式即得无偏内积估计。
+失真则为
+\begin{equation}
+  D_{prod}\le\frac{\pi}{2d}\|y\|_2^2\,\mathbb E\|r\|_2^2
+  =\frac{\pi}{2d}\|y\|_2^2D_{mse}^{(b-1)}
+  \le\frac{\sqrt3\,\pi^2\|y\|_2^2}{d}\,4^{-b}.
+  \label{eq:38-tq-prod-bound}
+\end{equation}
+第一处不等式来自 QJL 方差，第二步来自残差定义，最后把主项位宽
+$b-1$ 代入上界，并将 $4^{-(b-1)}$ 写成 $4\cdot4^{-b}$；常数合并后正是
+$\sqrt3\,\pi^2$。信息论下界为
+$D_{prod}\ge\|y\|_2^2 4^{-b}/d$（单位查询时 $\|y\|_2=1$）。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt,
+              text width=3.5cm, minimum height=1.3cm},
+  arr/.style={->, thick}]
+  \node[box, fill=tkFillBlue] (x) at (1.55,2.45) {$x$（单位向量）};
+  \node[box, fill=tkGreen!22] (mse) at (5.75,4.35)
+    {Lloyd--Max 主项\\$b-1$ bit/坐标};
+  \node[box, fill=tkGreen!22] (xm) at (9.85,4.35)
+    {$\widetilde x_{mse}$\\查表 + $\Pi^{\top}$};
+  \node[box, fill=tkOrange!22] (res) at (5.75,0.65)
+    {$r=x-\widetilde x_{mse}$\\$\gamma=\|r\|_2$};
+  \node[box, fill=tkOrange!22] (qjl) at (9.85,0.65)
+    {QJL 残差项\\$\operatorname{sign}(Sr)$，1 bit/坐标};
+  \node[box, fill=tkPurple!18, text width=2.7cm] (sum) at (14.25,2.50)
+    {$\widetilde x$\\主项 + $\gamma$·QJL};
+  \draw[arr] (x.east) -- (mse.west);
+  \draw[arr] (x.east) -- (res.west);
+  \draw[arr] (mse.east) -- (xm.west);
+  \draw[arr] (xm.south) -- ++(0,-0.9) -| (res.north);
+  \draw[arr] (res.east) -- (qjl.west);
+  \draw[arr] (qjl.east) -- (sum.south west);
+  \draw[arr] (xm.east) -- (sum.north west);
+  \node[font=\tiny, text=tkGreen!45!black, anchor=south] at (7.80,5.30)
+    {压低 $\mathbb E\|r\|_2^2$};
+  \node[font=\tiny, text=tkOrange!75!black, anchor=north] at (7.80,-0.25)
+    {对残差方向无偏，$\gamma$ 恢复残差长度};
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.85)
+    {存储为 $b-1$ bit 索引 + 1 bit 符号 + 浮点 $\gamma$；若非单位输入还要保存输入范数。
+     共享的 $\Pi$、$S$ 与码本不计入单向量位数，但端到端压缩率必须把 $\gamma$ 与输入范数计入。
+     第一阶段只负责减小残差能量，第二阶段负责消除内积偏置，两者不能互换目标。};
+\end{tikzpicture}
+\caption{内积版 TurboQuant 的两阶段结构。$b-1$ bit Lloyd--Max 主项降低残差
+能量，1 bit QJL 对残差方向作无偏估计，浮点范数恢复其长度。}
+\label{fig:38-tq-two-stage}
+\end{figure}
+
+论文给出的低比特参考值如下。$D_{prod}$ 一列写成
+$dD_{prod}/\|y\|_2^2$，从而去掉维度与查询范数；这些是小位宽数值结果，
+不要拿式~\ref{eq:38-tq-panter} 的大位宽近似逐位反推。
+\begin{center}\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+总位宽 $b$ & 1 & 2 & 3 & 4 \\
+\midrule
+$D_{mse}$（约） & 0.363 & 0.117 & 0.030 & 0.009 \\
+$dD_{prod}/\|y\|_2^2$（约） & 1.571 & 0.560 & 0.180 & 0.047 \\
+\bottomrule
+\end{tabular}
+\end{center}
+$b=1$ 时主项为 0 bit，全部预算用于 QJL，故第一列近似为 $\pi/2$；
+$b=2$ 时上界公式给 $\frac\pi2(1-2/\pi)\approx0.571$，
+与论文更精细的 0.56 一致。端到端 KV cache 实验还可把异常通道与普通通道
+分配不同位宽，例如 128 通道中 32 个用 3 bit、96 个用 2 bit，平均正是
+$(32\cdot3+96\cdot2)/128=2.5$ bit；这属于通道分组策略，不改变两阶段推导。
+
+\begin{kaogu}[F3]{TurboQuant 与 SVDQuant：能借视角，不能直接搬算法}
+\begin{itemize}[itemsep=0.5pt,topsep=1pt]
+  \item \textbf{目标不同}：TurboQuant 量化单位向量并估计内积；SVDQuant 同时量化
+        Linear 的激活与权重，目标是层输出误差与 W4A4 kernel 吞吐。
+  \item \textbf{旋转不同}：Haar 旋转用稠密正交阵把任意向量变成已知坐标分布；
+        SmoothQuant 的对角缩放只重分配各输入通道幅值，两者不能混称“平滑”。
+  \item \textbf{码本不同}：Lloyd--Max 是非均匀浮点码点，不是 E2M1/INT4 的硬件码本；
+        QJL 还要随机投影、符号位与浮点残差范数，不能伪装成一次 NVFP4 MMA。
+  \item \textbf{保证不同}：$D_{prod}$ 的无偏性来自 QJL 的条件无偏，普通 RTN、GPTQ
+        与 NVFP4 都没有这条前提；信息论上下界也不能直接变成 Linear 层精度承诺。
+  \item \textbf{可借方法}：把重构 MSE、下游内积误差与系统开销分开评估；用随机旋转
+        替代逐层校准时，必须另算旋转、范数和随机矩阵的时间与存储成本。
+\end{itemize}
+\end{kaogu}
+
+\section{扩展阅读：DVD-Quant}\label{sec:38-dvd}
+
+DVD-Quant（arXiv:2505.18663）面向视频 DiT 的低比特后训练量化，由三项机制
+组成：BGR 在离线侧精修权重量化网格，ARQ 在在线侧处理随时间步变化的激活，
+$\delta$-GBS 再按特征变化速度分配每步位宽。先澄清“data-free”：它指
+\textbf{不依赖离线校准数据集}，不是推理时无统计、无额外计算。ARQ 要在
+forward 中做旋转与 absmax，$\delta$-GBS 要读取相邻时间步特征并累计变化量，
+二者都有在线成本。
+
+\subsection{BGR：有界初始化加量化网格坐标下降}
+
+\subsubsection{从 MinMax 到逐通道优化目标}
+
+对一个权重输出行 $W$，$b$-bit 非对称量化写成
+\begin{equation}
+  q=\operatorname{clamp}\!\left(
+  \operatorname{round}(W/\Delta)+z,\ 0,\ q_{max}\right),\qquad
+  \widehat W=\Delta(q-z),\qquad q_{max}=2^b-1,
+  \label{eq:38-dvd-minmax}
+\end{equation}
+其中步长 $\Delta$ 与整数 zero-point $z$ 按行独立。普通 MinMax 取
+$\Delta=(W_{max}-W_{min})/q_{max}$、
+$z=-\operatorname{round}(W_{min}/\Delta)$。当权重近似零均值高斯分布时，
+极少数远离主体的值会把整个网格拉宽：大量码字落在稀疏尾部，高密度中心区
+反而只剩很粗的间隔。
+
+BGR 直接以重建误差为目标：
+\begin{equation}
+  \min_{\Delta,z,q}\|W-\Delta(q-z)\|_2^2,
+  \qquad q\in\{0,\ldots,q_{max}\}^K,\quad z\in\{0,\ldots,q_{max}\}.
+  \label{eq:38-dvd-bgr-objective}
+\end{equation}
+$\Delta$ 是连续变量，$z,q$ 是离散变量，联合求解困难，因此采用
+“外层选初始边界、内层交替精修”的结构。
+
+\subsubsection{外层 bounded search：clamp 只决定网格，不训练权重}
+
+外层逐步收紧下界 $\ell$ 与上界 $u$，构造
+$W_c=\operatorname{clamp}(W,\ell,u)$，再用 $W_c$ 的 MinMax 产生初始
+$\Delta^{(0)},z^{(0)}$。关键是有两处仍使用\textbf{原始} $W$：
+\begin{equation}
+  q^{(0)}=\operatorname{clamp}\!\left(
+  \operatorname{round}(W/\Delta^{(0)})+z^{(0)},0,q_{max}\right),
+  \qquad
+  \mathcal E=\|W-\Delta^{(0)}(q^{(0)}-z^{(0)})\|_2^2.
+  \label{eq:38-dvd-bgr-outer}
+\end{equation}
+因此 clamp 不是把异常权重永久截掉，而是在探索“牺牲多少尾部重建误差，
+换取主体区域更细的网格”。每个候选边界都经过内层精修并重新计算原始权重
+误差，最后保留误差最小的一组。这也解释了为什么不能只按 clipped 张量的
+误差选边界：那会漏掉被截尾值本身的代价。
+
+\subsubsection{内层三步：$\Delta$、$z$、$q$ 交替更新}
+
+固定 $q,z$，令 $c=q-z$。目标 $\|W-\Delta c\|_2^2$ 对 $\Delta$ 求导：
+\begin{equation}
+  \frac{\mathrm d}{\mathrm d\Delta}
+  \sum_i(W_i-\Delta c_i)^2
+  =-2\sum_ic_i(W_i-\Delta c_i)=0
+  \;\Longrightarrow\;
+  \boxed{\Delta'=\frac{\langle q-z,W\rangle}
+                         {\langle q-z,q-z\rangle}}.
+  \label{eq:38-bgr}
+\end{equation}
+若某一行 $\sum_ic_i^2=0$，闭式分母为零，实现必须保留旧步长或跳过该行，
+不能照公式产生 NaN。固定 $\Delta,q$，对 $z$ 做连续松弛并逐元素求导，得到
+\begin{equation}
+  z'=\operatorname{clamp}\!\left(
+  \operatorname{round}\!\left(\overline q-
+  \overline{W/\Delta'}\right),0,q_{max}\right),
+  \label{eq:38-dvd-bgr-z}
+\end{equation}
+其中横线表示该行均值。最后按新网格重取码：
+\begin{equation}
+  q'=\operatorname{clamp}\!\left(
+  \operatorname{round}(W/\Delta')+z',0,q_{max}\right).
+  \label{eq:38-dvd-bgr-q}
+\end{equation}
+重复式~\ref{eq:38-bgr}--\ref{eq:38-dvd-bgr-q}，直到误差改善小于阈值。
+由于取整和 clamp 会破坏纯坐标下降的单调性，外层始终保存当前最优误差及
+对应参数；工程实现还可在内层只接受实际降低误差的候选。
+
+一个最小数值例可以直接复算式~\ref{eq:38-bgr}。固定
+$c=q-z=(-1,0,2)$、$W=(-0.9,0.1,1.8)$，初始 $\Delta=1$ 时平方误差为
+$(0.1)^2+(0.1)^2+(-0.2)^2=0.06$；闭式更新给
+\begin{equation}
+  \Delta'=\frac{(-1)(-0.9)+0\cdot0.1+2\cdot1.8}{(-1)^2+0^2+2^2}
+  =0.9,
+  \label{eq:38-dvd-bgr-example}
+\end{equation}
+新重建为 $(-0.9,0,1.8)$，平方误差降为 $0.01$。随后仍要更新 $z,q$ 并重新
+评分，不能把一次 $\Delta$ 更新当成整个 BGR 已完成。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              text width=3.4cm, minimum height=1.05cm},
+  arr/.style={->, thick}]
+  \node[font=\tiny, anchor=west] at (0,4.35)
+    {(a) 外层：为高密度主体寻找更合适的初始网格（示意）};
+  \draw[thick, tkBlue] plot[smooth, tension=0.65] coordinates
+    {(0.3,1.05) (1.1,1.15) (2.0,1.55) (3.0,3.45)
+     (4.0,1.55) (4.9,1.15) (5.7,1.05)};
+  \draw[->] (0.2,0.85) -- (6.1,0.85);
+  \foreach \x in {0.55,1.30,2.05,2.80,3.55,4.30,5.05,5.80}
+    \draw[black!45] (\x,0.65) -- (\x,0.90);
+  \foreach \x in {1.65,2.40,3.15,3.90,4.65}
+    \draw[tkOrange, thick] (\x,0.50) -- (\x,1.00);
+  \node[font=\tiny, text=black!60] at (1.0,0.15) {MinMax：网格被尾部拉宽};
+  \node[font=\tiny, text=tkOrange!75!black] at (4.0,0.15) {bounded init：主体更密};
+  \fill[tkRed] (5.65,1.06) circle (1.2pt);
+  \node[font=\tiny, text=tkRed, anchor=south east] at (5.55,1.32) {少量尾部值};
+
+  \node[font=\tiny, anchor=west] at (7.2,4.35)
+    {(b) 内层：交替精修并保留最优};
+  \node[box, fill=tkFillBlue] (init) at (9.1,3.05)
+    {$\Delta^{(0)},z^{(0)},q^{(0)}$};
+  \node[box, fill=tkGreen!22] (delta) at (13.2,3.70)
+    {固定 $q,z$\\最小二乘求 $\Delta'$};
+  \node[box, fill=tkGreen!22] (zero) at (13.2,1.95)
+    {固定 $\Delta,q$\\均值近似求 $z'$};
+  \node[box, fill=tkOrange!22] (code) at (9.1,1.15)
+    {重算 $q'$\\按原始 $W$ 评分};
+  \draw[arr] (init.east) -- (11.20,3.05) |- (delta.west);
+  \draw[arr] (delta.south) -- (zero.north);
+  \draw[arr] (zero.west) -- (11.20,1.95) |- (code.east);
+  \draw[arr] (code.south) -- (9.10,0.35) -- (15.45,0.35) --
+    (15.45,4.70) -- (13.20,4.70) -- (delta.north);
+  \node[font=\tiny, text=tkPurple!70!black] at (9.10,2.10)
+    {$\mathcal E^*\gets\min$ 候选误差};
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.55)
+    {外层每次收紧边界都重新进入右侧循环；原始 $W$ 始终用于取码与评分。
+     左侧竖线仅表示网格相对疏密，不代表真实权重数据。BGR 全部在离线量化期完成，
+     推理时仍只读一组 $\Delta,z,q$，不会增加一次 GEMM 的在线迭代。};
+\end{tikzpicture}
+\caption{BGR 的两层结构。外层用有界搜索提供初始网格，内层依次更新步长、
+zero-point 与码字，并按原始权重误差保留最优候选。}
+\label{fig:38-dvd-bgr}
+\end{figure}
+
+论文在 HunyuanVideo 的权重量级实验中报告 BGR 相对 MinMax 可显著降低重建
+误差（约 $86\%$，本书未复测）。这个数只针对其模型、层与评价口径；
+它能说明网格精修的潜力，不能直接外推为 SVDQuant 残差的收益。
+
+\subsection{ARQ：Hadamard 旋转与在线逐通道缩放}
+
+\subsubsection{代数恒等式与在线计算位置}
+
+令归一化 Hadamard 阵 $H\in\mathbb R^{K\times K}$ 满足 $HH^{\top}=I$。
+沿用本书 $Y=XW^{\top}$ 的方向，有
+\begin{equation}
+  XW^{\top}=XHH^{\top}W^{\top}=(XH)(WH)^{\top}.
+  \label{eq:38-dvd-arq-equiv}
+\end{equation}
+旋转把单个极大值分散到更多坐标，但不能保证每个输出通道都不再出现异常值；
+ARQ 因而在旋转后、当前 forward 内重新计算
+\begin{equation}
+  U=XH,\qquad
+  \lambda_j=\max_i|U_{ij}|,\qquad
+  \Lambda=\operatorname{diag}(\lambda_1,\ldots,\lambda_K).
+  \label{eq:38-dvd-arq-lambda}
+\end{equation}
+激活量化与权重离线处理分别为
+\begin{equation}
+  \widetilde X=\mathcal Q(U\Lambda^{-1}),\qquad
+  \widetilde W=\operatorname{BGR}(WH),
+  \label{eq:38-dvd-arq-quant}
+\end{equation}
+求值时把 $\Lambda$ 放回激活反量化侧：
+\begin{equation}
+  Y\approx\widetilde X\Lambda\widetilde W^{\top}
+  \approx U\Lambda^{-1}\Lambda(WH)^{\top}
+  =XW^{\top}.
+  \label{eq:38-dvd-arq-output}
+\end{equation}
+这与 SmoothQuant 的离线 $\widehat X=XS^{-1}$ 看似相似，实则有三点不同：
+$S$ 来自校准数据且折进权重，$\Lambda$ 来自当前输入且保留在在线反量化侧；
+ARQ 还多了旋转 $H$；最后，$\Lambda$ 随 denoising timestep 变化，可处理视频
+DiT 各步激活量程不一致的问题。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt,
+              text width=3.4cm, minimum height=1.25cm},
+  arr/.style={->, thick}]
+  \node[box, fill=tkFillBlue] (x) at (1.8,3.65) {$X$（当前时间步）};
+  \node[box, fill=tkOrange!22] (rot) at (5.7,3.65) {$U=XH$\\快速 Hadamard};
+  \node[box, fill=tkOrange!22] (scale) at (9.7,3.65)
+    {在线 absmax\\$\Lambda=\operatorname{diag}(\lambda_j)$};
+  \node[box, fill=tkGreen!22] (qx) at (13.7,3.65)
+    {$\mathcal Q(U\Lambda^{-1})$\\低位激活码};
+  \draw[arr] (x) -- (rot);
+  \draw[arr] (rot) -- (scale);
+  \draw[arr] (scale) -- (qx);
+  \node[box, fill=tkPurple!18] (w) at (2.7,0.95) {$W$（离线）};
+  \node[box, fill=tkPurple!18] (qw) at (7.0,0.95) {$\operatorname{BGR}(WH)$\\离线权重码};
+  \node[box, fill=tkFillGreen, text width=4.1cm] (y) at (12.1,0.95)
+    {$\widetilde X\Lambda\widetilde W^{\top}$\\$\Lambda$ 在反量化侧回乘};
+  \draw[arr] (w) -- (qw);
+  \draw[arr] (qw) -- (y);
+  \draw[arr] (qx.south) -- (y.north);
+  \node[font=\tiny, text=tkOrange!75!black, anchor=north] at (7.7,2.35)
+    {旋转分散 massive outlier；在线缩放再处理 channel-wise outlier};
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.55)
+    {快速 Hadamard 变换为 $O(K\log K)$，在线 absmax 还要读当前 $U$。
+     论文理论式按通道写 $\Lambda$，实际实验 kernel 使用与 Tensor Core GEMM
+     粒度对齐的 block-wise 版本；不能把逐通道公式直接当成现有 NVFP4 kernel 的输入约定。};
+\end{tikzpicture}
+\caption{ARQ 的在线激活路径与离线路径。旋转后的激活在每次 forward 重新计算
+缩放因子，权重则离线旋转并用 BGR 量化；$\Lambda$ 不折入权重。}
+\label{fig:38-dvd-arq}
+\end{figure}
+
+ARQ 的成本与边界必须和精度收益一起写：快速 Hadamard 变换把旋转从稠密矩阵的
+$O(K^2)$ 降为 $O(K\log K)$，但 absmax 仍需 $O(MK)$ 读取；$\Lambda$ 位于归约轴
+$K$ 上，必须在反量化或分组 MMA 的明确位置回乘；零幅值通道还要定义保护规则。
+论文也明确说明，理论节展示 per-channel 形式，实际性能与精度实验使用
+hardware-aligned 的 block-wise ARQ。因此“代数上可乘回”不等于第~\ref{ch:40}~章
+的现有 native pack 与 block-scaled MMA 无需修改即可消费。
+
+\subsection{$\delta$-GBS：按特征变化分配时间步位宽}
+
+\subsubsection{因果累计、切档与重置}
+
+设 $F_t$ 是第 $t$ 个 denoising step 的模型输出特征，相邻变化量为
+\begin{equation}
+  \ell_1(F,t)=\frac{\|F_t-F_{t-1}\|_1}{\|F_{t-1}\|_1}.
+  \label{eq:38-dvd-gbs-l1}
+\end{equation}
+分母用于消除不同特征整体尺度的影响。令 $t_p$ 为最近一次切到高位宽并重置的
+时间步，在第 $t_i$ 步只用已经观察到的历史：
+\begin{equation}
+  C_i=\sum_{t=t_p}^{t_{i-1}}\ell_1(F,t),\qquad
+  b_i=\begin{cases}
+    b_{low}, & C_i<\delta,\\
+    b_{high}, & C_i\ge\delta.
+  \end{cases}
+  \label{eq:38-dvd-gbs-rule}
+\end{equation}
+达到阈值时，本步使用 $b_{high}$，随后把累计量清零，再从本步变化量开始新一段。
+决策不读未来特征。这里累计的是\textbf{特征变化量}，不是严格的量化误差；
+“变化慢就可以用低位宽”是需要按模型验证的启发式假设。
+
+一个 $\delta=0.20$、$b_{low}=4$、$b_{high}=8$ 的例子如下。初始累计量为 0，
+前五步新增 $\ell_1$ 分别为 $0.08,0.07,0.06,0.05,0.04$：
+\begin{center}\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+步骤 $t_i$ & 1 & 2 & 3 & 4 & 5 \\
+\midrule
+决策前累计 $C_i$ & 0 & 0.08 & 0.15 & 0.21 & 0.05 \\
+位宽 $b_i$ & 4 & 4 & 4 & 8 & 4 \\
+本步新增 $\ell_1$ & 0.08 & 0.07 & 0.06 & 0.05 & 0.04 \\
+\bottomrule
+\end{tabular}
+\end{center}
+第 3 步决策时累计值仍为 $0.15$，所以仍用 4 bit；第 4 步看到 $0.21\ge0.20$，
+用 8 bit 并重置，再把第 4 步自身的 $0.05$ 计入下一段。平均位宽是
+$(4+4+4+8+4)/5=4.8$ bit。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  low/.style={draw, fill=tkGreen!24, minimum width=2.25cm, minimum height=0.85cm,
+              align=center, font=\tiny},
+  high/.style={draw, fill=tkOrange!35, minimum width=2.25cm, minimum height=0.85cm,
+               align=center, font=\tiny}]
+  \foreach \x/\t/\c/\b/\kind in {
+    1.5/1/{0}/{4}/low,
+    4.5/2/{0.08}/{4}/low,
+    7.5/3/{0.15}/{4}/low,
+    10.5/4/{0.21}/{8}/high,
+    13.5/5/{0.05}/{4}/low}{
+    \node[font=\tiny] at (\x,3.55) {$t_{\t}$};
+    \node[font=\tiny, anchor=east] at (0.15,2.95) {};
+    \node[\kind] at (\x,2.70) {$b=\b$ bit};
+    \node[font=\tiny] at (\x,1.90) {$C=\c$};
+  }
+  \node[font=\tiny, anchor=east] at (0.1,2.70) {位宽};
+  \node[font=\tiny, anchor=east] at (0.1,1.90) {决策前累计};
+  \foreach \x/\v in {1.5/0.08,4.5/0.07,7.5/0.06,10.5/0.05,13.5/0.04}{
+    \draw[->, thick] (\x,1.55) -- (\x,0.85);
+    \node[font=\tiny, anchor=north] at (\x,0.72) {$+\v$};
+  }
+  \draw[very thick, tkRed] (10.5,3.95) -- (10.5,3.25);
+  \node[font=\tiny, text=tkRed, anchor=south] at (10.5,3.98) {达到 $\delta=0.20$};
+  \node[font=\tiny, text=tkRed, anchor=west] at (11.0,3.35) {高位宽后重置};
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.05)
+    {本例平均位宽为 $4.8$ bit。绿色低精度段持续累计特征变化，橙色步触发高精度与重置；
+     每步自身的增量在该步计算完成后才进入下一段累计。};
+\end{tikzpicture}
+\caption{$\delta$-GBS 的累计、切档与重置示例（$\delta=0.20$）。阈值控制的是
+高精度段的触发频率，进而决定平均位宽。}
+\label{fig:38-dvd-gbs}
+\end{figure}
+
+\subsubsection{平均位宽、阈值方向与系统边界}
+
+若总步数为 $T$，高位宽步数为 $T_{high}$，平均激活位宽为
+\begin{equation}
+  \bar b=\frac{(T-T_{high})b_{low}+T_{high}b_{high}}T.
+  \label{eq:38-dvd-gbs-average}
+\end{equation}
+论文的 W4A6 实验是约一半时间步 W4A4、另一半 W4A8，因而
+$\bar b\approx(4+8)/2=6$；它不是 $\delta$-GBS 自动保证的固定档。
+$\delta$ 越小，越容易触发高位宽，平均位宽与质量通常越高；$\delta\to0$ 时趋近
+全 W4A8，$\delta\to\infty$ 时趋近全 W4A4。实际部署需要同时准备 W4A4 与 W4A8
+kernel，不必开发一个逐元素可变的“W4A6 kernel”。
+
+与 cache 调度联用时还要把两种决策分开：$\delta$-GBS 改变本步数值精度，
+TeaCache 等机制决定本步是否复用旧特征。论文把二者组合报告了额外加速，但这不是
+“同一个阈值同时控制量化与缓存”的证明。借到 SVDQuant 或 cache-dit 时，必须分别
+验证双位宽算子、阈值、调度状态和精度，不能直接照搬论文的 $\delta$。
+
+\begin{kaogu}[F3/F4]{把 BGR 移植到 SVDQuant 残差时，必须改写的五件事}
+\begin{itemize}[itemsep=0.5pt,topsep=1pt]
+  \item \textbf{粒度}：DVD-Quant 原文按权重输出行精修；SVDQuant 的 NVFP4 以 16 元素
+        为一组，不能直接套用 per-row zero-point。
+  \item \textbf{对象}：精修目标是分解后的残差 $R$，不是原始 $W$，也不是低秩因子
+        $L_1,L_2$；目标函数仍应含当前低秩分支的总重构误差。
+  \item \textbf{码本与两级 scale}：NVFP4 码是 E2M1 值，候选 group scale 还要模拟
+        FP8 E4M3 舍入与全局 scale 的共同作用，不能只优化浮点 $\Delta$。
+  \item \textbf{接受准则}：对称无 zero-point 时可写
+        $\Delta'=\sum_{i\in g}q_iR_i/\sum_{i\in g}q_i^2$，但分母为零要跳过；
+        重新取整、clamp 并序列化后，只有总误差实际下降才接受。
+  \item \textbf{验证边界}：BGR 离线迭代本身不增加推理时间，但收益必须在目标模型、
+        目标 kernel 与图像/视频指标上重新验证；目前只能视为原型方向，不能写成
+        SVDQuant 已获得的改进。
+\end{itemize}
+\end{kaogu}
+
+\section{性能分析}
+
+本节以下数字转述自 SVDQuant 论文（arXiv:2411.05007，Table 4 与 Fig.~6/8），
+\textbf{本书未复测}；前两节 TurboQuant 与 DVD-Quant 的数值另按各自论文标明。
+
+\textbf{（1）为什么必须融合 kernel}。低秩分支的算力只占
+$r(K+N)/(KN)$（式~\ref{eq:38-flops}），但算力不等于延迟。论文 Fig.~6(a)
+把 QKV projection 的延迟拆成四段（图~\ref{fig:38-latency}）：down/up
+projection 作为独立 kernel 时，图注按\textbf{不含低秩分支的 4-bit 基线}
+报告 rank-32 分支带来 $57\%$ 额外延迟；图中两根柱则是未融合
+$461\,\mu s$ 与融合后 $322\,\mu s$，二者之比为 $1.43\times$，并不是
+$57\%$ 的分母。原因不在算力而在访存——down projection 要\textbf{额外读
+一遍 16-bit 输入}，up projection 要\textbf{额外写一遍 16-bit 输出}，而
+rank 很小时这两个张量的尺寸并不随 $r$ 缩小，瓶颈于是从计算转到访存；
+激活放不进 L2 cache 时更糟：DiT 块里 QKV 的 up projection 输出超过
+L2 容量，额外读写直接打到 DRAM。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+  \begin{scope}[xshift=4.4cm]
+  \draw[->, thick] (0,0) -- (0,4.35);
+  \node[font=\tiny, anchor=south west] at (0.1,3.95) {延迟（$\mu$s）};
+  \draw[thick] (0,0) -- (5.7,0);
+  % naive 柱
+  \fill[tkRed!75]    (1.1,0)     rectangle ++(1.15,0.06);
+  \fill[black!30]   (1.1,0.06)  rectangle ++(1.15,0.14);
+  \fill[tkGreen!60]  (1.1,0.20)  rectangle ++(1.15,2.41);
+  \fill[tkOrange!70] (1.1,2.61)  rectangle ++(1.15,1.26);
+  \node[font=\tiny, text=tkRed!80!black, anchor=west] at (2.3,0.28) {7};
+  \node[font=\tiny, text=black!70, anchor=west] at (2.3,0.62) {17};
+  \node[font=\tiny, text=tkGreen!35!black, anchor=west] at (2.3,1.5) {287};
+  \node[font=\tiny, text=tkOrange!45!black, anchor=west] at (2.3,3.35) {150};
+  \node[font=\tiny, anchor=south] at (1.67,3.92) {461};
+  % nunchaku 柱
+  \fill[black!30]   (4.4,0)    rectangle ++(1.15,0.185);
+  \fill[tkGreen!60]  (4.4,0.185) rectangle ++(1.15,2.52);
+  \node[font=\tiny, text=black!70, anchor=west] at (5.6,0.55) {22};
+  \node[font=\tiny, text=tkGreen!35!black, anchor=west] at (5.6,1.6) {300};
+  \node[font=\tiny, anchor=south east] at (4.85,2.73) {322};
+  % 1.43x 标注
+  \draw[dashed, thick, tkPurple] (1.67,4.02) -- (4.97,4.02);
+  \draw[dashed, thick, tkPurple] (4.97,2.76) -- (4.97,4.02);
+  \node[font=\tiny, text=tkPurple!85!black, anchor=south] at (3.32,4.04)
+    {$1.43\times$};
+  % 轴标签
+  \node[font=\tiny, anchor=north] at (1.67,-0.08) {naive（独立 kernel）};
+  \node[font=\tiny, anchor=north] at (4.97,-0.08) {Nunchaku（融合后）};
+  % 图例（右侧空白区，竖排）
+  \foreach \y/\c/\t in {3.55/tkRed!75/{Down Proj}, 3.18/tkOrange!70/{Up Proj},
+                        2.81/tkGreen!60/{4-Bit Compute}, 2.44/black!30/{Quantize}}{
+    \fill[\c] (6.4,\y) rectangle ++(0.22,0.16);
+    \node[font=\tiny, anchor=west] at (6.7,\y+0.08) {\t};
+  }
+  \end{scope}
+  \node[anchor=north west, align=left, text width=15.8cm, font=\tiny] at (0,-0.42)
+    {数值取自论文 Fig.~6(a) 的延迟分解（rank 32，$1.43\times$ 标注为原文）。
+     融合后 up projection（150）与 down projection（7）两段整段消失，4-bit
+     compute 从 287 涨到 300、quantize 从 17 涨到 22——多出来的部分是融合
+     kernel 内部承担低秩分支的代价，合计仅 $+18\,\mu s$。};
+\end{tikzpicture}
+\caption{QKV projection 的延迟分解（$1.43\times$ 是未融合/融合之比）。
+论文图注另按不含低秩分支的 4-bit 基线报告未融合开销 $57\%$；融合后两段
+独立的 16-bit 读写整段消失。}
+\label{fig:38-latency}
+\end{figure}
+
+\textbf{（2）融合沿"共享张量"的边界切}。图~\ref{fig:38-fusion} 是论文给出的
+分界：down projection 与 quantize 共享同一个输入 $\widehat X$，up projection
+与 4-bit compute 共享同一个输出。于是前两者可以合成一个 kernel（读一遍
+$\widehat X$，同时产出低秩中间量与 4-bit 量化码），后两者合成另一个 kernel
+（低秩 up 结果与 4-bit 结果在片上直接相加，只写一遍输出）。这样低秩分支
+只增加 $5\%$--$10\%$ 的延迟，kernel 调用次数也减半。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  blk/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              minimum height=0.7cm},
+  grp/.style={draw, dashed, rounded corners=4pt, inner sep=6pt}]
+  % Fused Kernel 1
+  \node[blk, fill=tkFillGreen, minimum width=2.4cm] (in) at (2.2,1.5)
+    {$\widehat X$（bf16）};
+  \node[blk, fill=tkRed!30, text width=2.0cm] (down) at (5.6,2.4)
+    {Down Proj\\$\boldsymbol{L_2}$};
+  \node[blk, fill=black!15, text width=1.8cm] (quant) at (5.6,0.6)
+    {Quantize};
+  \node[blk, fill=tkFillBlue, minimum width=1.9cm] (o1) at (8.9,2.4)
+    {$\widehat X\boldsymbol{L_2}^{\top}$};
+  \node[blk, fill=tkFillBlue, minimum width=1.9cm] (o2) at (8.9,0.6)
+    {$\mathcal Q(\widehat X)\,s_X$};
+  \draw[-{Stealth}, thick] (in.east) -- (down.west);
+  \draw[-{Stealth}, thick] (in.east) -- (quant.west);
+  \draw[-{Stealth}, thick] (down) -- (o1);
+  \draw[-{Stealth}, thick] (quant) -- (o2);
+  \node[grp, fit=(down)(quant)(o1)(o2), label={[font=\tiny, text=tkGreen!45!black]above:Fused Kernel 1（共享输入）}] {};
+  \node[font=\tiny, text=tkRed, anchor=north] at (2.2,0.95) {shared input};
+  % Fused Kernel 2
+  \node[blk, fill=tkFillBlue, minimum width=1.9cm] (i1) at (12.0,2.4)
+    {$\widehat X\boldsymbol{L_2}^{\top}$};
+  \node[blk, fill=tkFillBlue, minimum width=1.9cm] (i2) at (12.0,0.6)
+    {$\mathcal Q(\widehat X)\,s_X$};
+  \node[blk, fill=tkOrange!35, text width=2.0cm] (up) at (15.2,2.4)
+    {Up Proj\\$\boldsymbol{L_1}$};
+  \node[blk, fill=tkGreen!35, text width=2.0cm] (comp) at (15.2,0.6)
+    {4-Bit 乘加\\$\mathcal Q_R s_R$};
+  \node[blk, fill=tkFillGreen, minimum width=1.0cm] (add) at (17.6,1.5) {$\oplus$};
+  \draw[-{Stealth}, thick] (i1) -- (up);
+  \draw[-{Stealth}, thick] (i2) -- (comp);
+  \draw[-{Stealth}, thick] (up.east) -- (add.north west);
+  \draw[-{Stealth}, thick] (comp.east) -- (add.south west);
+  \node[grp, fit=(up)(comp)(add), label={[font=\tiny, text=tkGreen!45!black]above:Fused Kernel 2（共享输出）}] {};
+  \node[font=\tiny, text=tkRed, anchor=north] at (17.6,0.75) {shared output};
+\end{tikzpicture}
+\caption{kernel 融合的两个边界（复刻论文 Fig.~6(b)；标号按本书约定，论文以
+$L_1$ 为 down）。左：$L_2$（down）与量化共享输入 $\widehat X$；右：$L_1$（up）
+与 4-bit 乘加共享输出。图中 $s_X$、$s_R$ 分别为激活与残差权重的量化尺度，
+码乘尺度即反量化。融合把低秩分支的额外 16-bit 读写整段消掉。}
+\label{fig:38-fusion}
+\end{figure}
+
+\textbf{（3）端到端数字}。FLUX 单步（RTX 4090）：
+
+\begin{center}\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+FLUX 单步（RTX 4090） & BF16 & naive INT4 & SVDQuant+Nunchaku \\
+\midrule
+延迟 & 657 ms & 212 ms & 218 ms \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+SVDQuant 的 218 ms 相对 naive INT4 的 212 ms 只差 $3\%$——这是融合后的
+端到端代价。图~\ref{fig:38-latency} 里 $57\%$ 与 $1.43\times$ 的分母也不同：
+前者对无低秩分支的 4-bit 基线，后者对未融合版本；这里则是整步端到端，
+三者共同说明\textbf{FLOPs 占比 $2\%$ 不等于免费，融合才是答案}。
+
+\textbf{（4）显存与加速口径}。FLUX 的模型体积从 $22.2$ GiB 降到 $6.1$ GiB
+（低秩分支额外约 $0.3$ GiB，ratio $3.6\times$）；摘要与正文的 $3.5\times$
+对应另一个指标：DiT 推理显存从 $24.4$ GiB 降到 $6.9$ GiB（Fig.~8(b)，
+$24.4/6.9\approx3.54$）。两者都相对 BF16，但一个是模型体积、一个是推理
+显存，不能按四舍五入合并。"相对 16-bit 模型 $8.7\times$"的前提是
+\textbf{消除 CPU offloading}（16 GB 的 4090 上 BF16 放不下，必须 offload），
+"相对 NF4 W4A16 基线 $3.0\times$"是另一条延迟基线——引用任何一组都必须
+带指标与基线。
+\textbf{（5）配置一致性}：论文 4-bit 主结果的残差量化用了 GPTQ 而非纯 RTN；
+拿纯 RTN 实现对比论文主表属于配置不一致。cache-dit 默认路径
+（第~\ref{ch:39}~章）是 RTN 加可选 refine，与论文主表的差异在对比数字时
+要显式声明。
+
+\section{实践经验}
+
+\begin{kaogu}[F3]{SVDQuant 常见误读}
+\begin{itemize}[itemsep=0.5pt,topsep=1pt]
+  \item "$\alpha=0.5$ 理论最优"——只表示式~\ref{eq:38-half} 下两侧通道最大幅值
+        相等；实际按模型/层校准；
+  \item "SVD 使端到端量化误差最小"——Eckart--Young 只保证无权 Frobenius 的
+        rank-$r$ 最优（式~\ref{eq:38-tail}），不含激活加权与量化器；
+  \item "尾奇异值的几何平均"——是尾奇异值平方和开根；
+  \item "refine 后残差仍等于原矩阵尾谱"——尾谱恒等式只属于精确初始截断；
+  \item "低秩分支几乎无开销"——未融合时论文实测 $57\%$ 延迟开销（相对无
+        低秩分支的 4-bit 基线）；
+  \item "论文主结果就是纯 RTN"——主结果含 GPTQ；
+  \item "TurboQuant 的误差界可直接用于 SVDQ"——其界依赖 QJL 条件无偏性；
+        上界常数是 $\sqrt3\,\pi/2$，且 $bd$ bit 之外还有浮点范数；
+  \item "DVD-Quant 的 data-free $=$ 运行时无统计"——ARQ/$\delta$-GBS 都用
+        运行时统计；W4A6 是高低位宽步数形成的平均值，不是固定 kernel 档位；
+  \item "$3.6\times$/$3.5\times$/$3\times$ 可脱离口径引用"——前两者分别是
+        模型体积与推理显存，第三者是相对 NF4 W4A16 的延迟，详见性能分析节。
+\end{itemize}
+\end{kaogu}
+
+\section{常见坑}
+
+\begin{itemize}[itemsep=1pt,topsep=2pt]
+  \item \textbf{转置陷阱}：原文 $L_1$ 是 down 因子，本书（与 cache-dit 代码）
+        $L_1$ 是 up 因子。交叉阅读论文、nunchaku 源码与本书时先确认方向
+        （式~\ref{eq:38-direction}）再谈公式。
+  \item \textbf{$S$ 的重复乘除}：实现里存储的 down 因子已经含 $S^{-1}$
+        （$\widetilde L_2=L_2S^{-1}$，低秩分支因此直接消费原始 $X$，
+        第~\ref{ch:39}~章）；谁在什么地方乘了 $s_j$，最容易在这里算两遍。
+  \item \textbf{数学可分解 $\ne$ kernel 可执行}：归约轴上的 scale（逐输入
+        通道、ARQ 的 $\Lambda$）要组内回乘，先确认目标 kernel 的组粒度与
+        MMA 语义再吃进去。
+  \item \textbf{Prop.~4.2 的适用边界}：单 scale、逐元素舍入、分布正则三条
+        前提缺一就不能引用该上界；group-wise 与 GPTQ 都要重新分析。
+  \item \textbf{默认 SVD 不是精确 SVD}：cache-dit 默认 \texttt{calibrate\_precision=low}
+        走随机化 \texttt{torch.svd\_lowrank}，不保证精确 Eckart--Young 最优，
+        尾谱恒等式不适用。
+\end{itemize}
+
+\section{面试要点速查}
+
+\begin{itemize}[itemsep=1pt,topsep=2pt]
+  \item Q：SmoothQuant 的平滑为什么是全精度等价的？代价去了哪？\\
+        A：$\widehat X\widehat W^{\top}=XS^{-1}SW^{\top}=XW^{\top}$
+        （式~\ref{eq:38-smq-equiv}），恒等；代价是权重侧 $\widehat W=WS$
+        继承放大的通道幅值，W4A4 下权重自己量化变差（式~\ref{eq:38-wterm}）。
+  \item Q：$\alpha$ 的意义？$\alpha=0.5$ 为什么常被误读？\\
+        A：对数域重新分配两侧幅值范围（式~\ref{eq:38-split}），乘积与 $\alpha$
+        无关（式~\ref{eq:38-product}）；$0.5$ 只表示两侧逐通道 max 幅值相等
+        （式~\ref{eq:38-half}），不是误差减半也不是理论最优。
+  \item Q：SVDQuant 的误差为什么只剩残差分支？\\
+        A：低秩分支是精确恒等式（式~\ref{eq:38-branch}），量化近似只加在
+        $\mathcal Q(\widehat X)\mathcal Q(R)^{\top}$ 上
+        （式~\ref{eq:38-residual-only}）。
+  \item Q：低秩分解为什么用 SVD？为什么不能声称"SVD 最优"？\\
+        A：Eckart--Young 给无权 Frobenius 最优（式~\ref{eq:38-tail}）；真实
+        目标是激活加权输出误差且含量化器，三层都超出定理范围。
+  \item Q：为什么顺序是先平滑、再 SVD、最后量化？反过来为什么差？\\
+        A：量化误差的奇异谱平，低秩抓不住；平滑后权重主奇异方向集中，低秩
+        才有效（\ref{sec:38-svdq}~节）。
+  \item Q：refine 的残差为什么要相对 $\widehat W$ 重锚定？\\
+        A：相对 $Z^{(t)}$ 会重复扣除上一次校正（式~\ref{eq:38-refine}）。
+  \item Q：TurboQuant/DVD-Quant 里有什么能直接搬进 SVDQ？\\
+        A：视角层面——区分重构 MSE 与内积/层输出误差（TurboQuant）、scale
+        的交替最小二乘精修（BGR，式~\ref{eq:38-bgr}）；算子与精度结论都不能搬。
+  \item Q：W4A4 的"4"对硬件意味着什么？\\
+        A：激活权重要变成 tensor core 可消费的 E2M1/INT4 码加 group scale
+        （第~\ref{ch:31}~章），归约轴 scale 要在 MMA 语义内回乘——这决定了
+        第~\ref{ch:40}~章 kernel 的全部数据布局。
+\end{itemize}
+
+\section{最小测试与动手实验}
+
+本章无 kernel 实验；以下七个数值实验在 CPU 上即可验证主线结论（numpy，
+本书未作为门禁执行，读者可自行复算）：
+
+\begin{lstlisting}[style=console]
+# 实验 1：平滑等价性。任意 X,W,s>0：
+#   norm(X @ W.T - (X/s) @ (W*s).T) == 0（浮点舍入级）
+# 实验 2：alpha 的乘积不变量。逐通道
+#   max|X_hat_j| * max|W_hat_j| == max|X_j| * max|W_j|（乘积不变量一节）
+# 实验 3：低秩吸收。对随机 W 做 SVD 截断 r=32：
+#   ||W - L1 @ L2||_F == sqrt(sum(sigma[r:]**2))（尾谱恒等式一节）
+#   再叠加 4-bit RTN：量化 R 的 rel-L2 明显小于量化 W 本身
+#   另将 L1,L2 转为 bf16，单独记录低秩分支的存储舍入 rel-L2
+# 实验 4：TurboQuant 1-bit。对多组 Haar 旋转估计 MSE 与内积均值，
+#   分别逼近 1-2/pi 与 (2/pi)*<y,x>；同时核对 sqrt(3)*pi/2 的常数。
+# 实验 5：QJL 两阶段。随机生成 S，检查内积估计均值无偏、方差随 d 下降；
+#   分别覆盖 r!=0 与 r=0，保存 gamma=||r||。
+# 实验 6：BGR 坐标更新。复算 c=(-1,0,2)、W=(-0.9,0.1,1.8)，
+#   检查 Delta=0.9 使 SSE 从 0.06 降到 0.01；再加入 z/q 更新和零分母行。
+# 实验 7：delta-GBS。输入增量 [0.08,0.07,0.06,0.05,0.04]、delta=0.20，
+#   检查位宽序列 [4,4,4,8,4] 与平均 4.8 bit；另扫描 delta 观察平均位宽。
+\end{lstlisting}
+
+观察点：实验 3 要把三种误差分开：截断误差 $\|R\|_F/\|W\|_F$ 由式
+\ref{eq:38-tail} 的尾谱决定；$R$ 的 4-bit 量化 rel-L2 由码点与分组决定；
+$L_1,L_2$ 的 bf16 存储则只引入另一个舍入项。通常第三项明显小于第二项，
+这才是"残差分支必须配 W4A4 专用 kernel、低秩分支必须高精度"的数值动机；
+不能把截断误差说成由 bf16 精度决定。具体倍数随权重谱与 rank 变化，
+读者可用自己的模型复算。实验 4--5 必须对旋转/投影的随机性取多样本平均，
+不能用一次随机矩阵的偏差冒充理论偏置；实验 6 要单独检查零分母分支；
+实验 7 则按“先用历史累计量决策、再计入本步增量”的顺序实现，避免用到未来信息。
+
+\section*{延伸阅读}
+
+\begin{itemize}[itemsep=1pt,topsep=2pt]
+  \item SmoothQuant（arXiv:2211.10438）：通道缩放平滑与 $\alpha$ 消融的原始出处；
+  \item SVDQuant（arXiv:2411.05007）：Prop.~4.1/4.2 证明见 Appendix A，
+        逐层配置见 Appendix D，论文数字口径见 Appendix E；
+  \item nunchaku（SVDQuant 官方引擎）：producer/GEMM 融合形态的一手实现，
+        可与第~\ref{ch:39}~章的 cache-dit 实现对照；
+  \item TurboQuant（arXiv:2504.19874）Theorem 1--2 与 DVD-Quant
+        （arXiv:2505.18663）Algorithm 1：两节扩展阅读的一手出处。
+\end{itemize}

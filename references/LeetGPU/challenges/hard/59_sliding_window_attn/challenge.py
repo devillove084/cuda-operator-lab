@@ -1,0 +1,184 @@
+import ctypes
+from typing import Any, Dict, List
+
+import torch
+from core.challenge_base import ChallengeBase, OutTensor, RandTensor
+
+
+class Challenge(ChallengeBase):
+    name = "Sliding Window Self-Attention"
+    atol = 1e-05
+    rtol = 1e-05
+    num_gpus = 1
+    access_tier = "free"
+
+    def reference_impl(
+        self,
+        Q: torch.Tensor,
+        K: torch.Tensor,
+        V: torch.Tensor,
+        output: torch.Tensor,
+        M: int,
+        d: int,
+        window_size: int,
+    ):
+        assert Q.shape == K.shape == V.shape == output.shape == (M, d)
+
+        scores = (Q @ K.T) / (d**0.5)
+
+        idxs = torch.arange(M)
+        mask = (idxs[None, :] - idxs[:, None]).abs() > window_size
+        mask = mask.to(Q.device)
+        scores.masked_fill_(mask, float("-inf"))
+        attn = torch.softmax(scores, dim=1)
+
+        torch.matmul(attn, V, out=output)
+
+    def reference_impl_jax(self, Q, K, V, M, d, window_size):
+        import jax
+        import jax.numpy as jnp
+
+        scores = (Q @ K.T) / (d**0.5)
+
+        idxs = jnp.arange(M)
+        mask = jnp.abs(idxs[None, :] - idxs[:, None]) > window_size
+        scores = jnp.where(mask, -jnp.inf, scores)
+        attn = jax.nn.softmax(scores, axis=1)
+
+        return jnp.matmul(attn, V)
+
+    def get_solve_signature(self) -> Dict[str, Any]:
+        return {
+            "Q": (ctypes.POINTER(ctypes.c_float), "in"),
+            "K": (ctypes.POINTER(ctypes.c_float), "in"),
+            "V": (ctypes.POINTER(ctypes.c_float), "in"),
+            "output": (ctypes.POINTER(ctypes.c_float), "out"),
+            "M": (ctypes.c_int, "in"),
+            "d": (ctypes.c_int, "in"),
+            "window_size": (ctypes.c_int, "in"),
+        }
+
+    def generate_example_test(self) -> Dict[str, Any]:
+        dtype = torch.float32
+        Q = torch.tensor(
+            [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], device=self.device, dtype=dtype
+        )
+        K = torch.tensor(
+            [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], device=self.device, dtype=dtype
+        )
+        V = torch.tensor(
+            [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], device=self.device, dtype=dtype
+        )
+        output = torch.empty(2, 4, device=self.device, dtype=dtype)
+        return {"Q": Q, "K": K, "V": V, "output": output, "M": 2, "d": 4, "window_size": 1}
+
+    def generate_functional_test(self) -> List[Dict[str, Any]]:
+        dtype = torch.float32
+        tests = []
+
+        # basic_example
+        tests.append(
+            {
+                "Q": torch.tensor(
+                    [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], device=self.device, dtype=dtype
+                ),
+                "K": torch.tensor(
+                    [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]], device=self.device, dtype=dtype
+                ),
+                "V": torch.tensor(
+                    [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], device=self.device, dtype=dtype
+                ),
+                "output": torch.empty(2, 4, device=self.device, dtype=dtype),
+                "M": 2,
+                "d": 4,
+                "window_size": 1,
+            }
+        )
+
+        # basic_example
+        tests.append(
+            {
+                "Q": torch.tensor(
+                    [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]], device=self.device, dtype=dtype
+                ),
+                "K": torch.tensor(
+                    [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], device=self.device, dtype=dtype
+                ),
+                "V": torch.tensor(
+                    [[1.0, 2.0, 3.0], [5.0, 6.0, 7.0]], device=self.device, dtype=dtype
+                ),
+                "output": torch.empty(2, 3, device=self.device, dtype=dtype),
+                "M": 2,
+                "d": 3,
+                "window_size": 1,
+            }
+        )
+
+        # zero_matrices
+        tests.append(
+            {
+                "Q": torch.zeros((3, 5), device=self.device, dtype=dtype),
+                "K": torch.zeros((3, 5), device=self.device, dtype=dtype),
+                "V": torch.zeros((3, 5), device=self.device, dtype=dtype),
+                "output": torch.empty(3, 5, device=self.device, dtype=dtype),
+                "M": 3,
+                "d": 5,
+                "window_size": 2,
+            }
+        )
+
+        # mixed_values
+        tests.append(
+            {
+                "Q": torch.tensor(
+                    [[-1.0, 2.0, -3.0], [4.0, -5.0, 6.0], [-7.0, 8.0, -9.0], [10.0, -11.0, 12.0]],
+                    device=self.device,
+                    dtype=dtype,
+                ),
+                "K": torch.tensor(
+                    [[2.0, -1.0, 3.0], [-4.0, 5.0, -6.0], [7.0, -8.0, 9.0], [-10.0, 11.0, -12.0]],
+                    device=self.device,
+                    dtype=dtype,
+                ),
+                "V": torch.tensor(
+                    [[1.0, 0.5, -0.5], [-1.0, 2.0, 3.0], [4.0, -2.0, 1.0], [0.0, 1.0, -1.0]],
+                    device=self.device,
+                    dtype=dtype,
+                ),
+                "output": torch.empty(4, 3, device=self.device, dtype=dtype),
+                "M": 4,
+                "d": 3,
+                "window_size": 2,
+            }
+        )
+
+        # large_matrices
+        tests.append(
+            {
+                "Q": torch.empty((128, 32), device=self.device, dtype=dtype).uniform_(-0.1, 0.1),
+                "K": torch.empty((128, 32), device=self.device, dtype=dtype).uniform_(-0.1, 0.1),
+                "V": torch.empty((128, 32), device=self.device, dtype=dtype).uniform_(-0.1, 0.1),
+                "output": torch.empty(128, 32, device=self.device, dtype=dtype),
+                "M": 128,
+                "d": 32,
+                "window_size": 8,
+            }
+        )
+
+        return tests
+
+    def generate_performance_test(self) -> Dict[str, Any]:
+        M, d, window_size = 5000, 64, 16
+        return {
+            # [-1, 1] like Causal Attention (#53). With [-100, 100] the scores had a std of
+            # ~3,000, so softmax was a near-argmax and float32 rounding in Q @ K^T flipped the
+            # weights of near-tied keys. Correct kernels that summed in a different order than
+            # the reference then failed the 1e-5 check at random.
+            "Q": RandTensor((M, d), -1.0, 1.0),
+            "K": RandTensor((M, d), -1.0, 1.0),
+            "V": RandTensor((M, d), -1.0, 1.0),
+            "output": OutTensor((M, d)),
+            "M": M,
+            "d": d,
+            "window_size": window_size,
+        }

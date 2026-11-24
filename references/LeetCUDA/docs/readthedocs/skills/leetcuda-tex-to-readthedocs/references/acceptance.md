@@ -1,0 +1,123 @@
+# 验收与预览
+
+## 三层验收，缺一层就会漏
+
+| 层 | 手段 | 能发现 |
+| --- | --- | --- |
+| ① 文件级 | `python -m convert.verify --src build/src --html build/html` | 章号、表格数、字面残迹、悬空锚点、未解析属性（通用项逐页 + 每本书一套 + 集合装配） |
+| ② 浏览器级 | `python tools/visual_check.py --html build/html --out build/shots/chapters` | MathJax 报错、页面上可见的字面残迹、控制台报错、404 资源 |
+| ③ 版式几何 | 已并进 `visual_check` | 图片/表格是否居中、有没有元素（过宽公式、宽表）撑出正文栏 |
+
+ch33/ch35/ch37 的表格、ch01 的丢图、ch00 的图内文字丢失都只有 ②③ 层能发现；只看 `sphinx-build` 的告警数会漏掉大量内容错误（**0 警告 ≠ 页面正确**）。
+
+**总数阈值会掩盖单点丢失**：表格数 126 → 125 时「≥90%」照样通过，ch37 的量化开销表就是这么漏掉的；改成逐章比对后立刻暴露。
+
+## 核对清单（任一不过即以非零码退出）
+
+`build.sh` 在 Sphinx 之后跑一次，RTD 的 `post_build` 同样会跑。**数量随书数增长**：通用项覆盖站点每一页（含子集合子目录，页面键用 docname），章号/表格/多行表头/书目录这四项**每本书各跑一套**（集合那套带「（CuTe文章集合）」后缀），最后再核一次集合装配。
+
+| 检查项 | 说明 |
+| --- | --- |
+| 源树无残留 token | 转换 token 全部还原 |
+| 标题无 pandoc 属性泄漏 | 标题里不残留 `{#id .unnumbered}` |
+| H1 章号与注册表一致 | `第 N 章：` / `附录 X：` 与计数器一致 |
+| 跨仓库清单已内联 | 页面不出现「代码清单未内联」提示块：书上 `../../../../<repo>/...` 的引用必须在 `sources/` 有冻结快照（缺快照时本地 checkout 看得见、RTD 看不见） |
+| 章引用编号未坍缩 | 防「所有章引用都渲染成同一个数字」 |
+| 表格已渲染 | 页面 `<table>` 数 ≥ 原书表格环境的 90% |
+| 站内锚点无悬空 | 全部 `page.html#anchor` 目标存在 |
+| 无 pandoc 原始 HTML 残迹 | 页面上不出现 `{=html}` / `<!-- -->` 字面文本 |
+| 数学区内无站内链接/锚点 | 公式里塞 Markdown 链接会让 MathJax 崩 |
+| 显示公式定界符配对 | 每个行首 `$$` 都是公式区间的端点 |
+| 显示公式未被拆成字面 `$` | 页面里不出现「孤立 `$` + 行内公式」 |
+| 表格单元格无 LaTeX 残渣 | 格子里不漏 `\cmidrule(lr){2-3}` 这类命令 |
+| 公式内无嵌套 `$` | `\text{…$…$…}` 会让 MyST 把公式切成两段 |
+| 强调标记成对（flanking） | 中英混排下 `**…。**见` 配不上对，字面标记会漏到页面上 |
+| HTML 表格内无 Markdown 残留 | raw HTML 表格里不残留 `[](…)` / `**…**` / `![…](…)` |
+| 逐章表格数不缺 | 按章比对原书表格环境数与页面 `<table>` 数（总数阈值会漏单张表） |
+| 多行表头已收进 thead | 源文两行表头的表，页面 `<thead>` 也要有两行 |
+| 页面图片均存在 | 页面引用的 `_images/…` 文件都在（raw HTML 图片需补隐藏引用） |
+| MyST 属性均已解析 | 页面上不出现字面 `{width=…}` / `{.class}` 这类未解析属性 |
+| 无字面 LaTeX 换行反斜杠 | 正文里不出现漏出来的 `\ `（`\\` 硬换行没转成 `<br>`） |
+| 公式内无 `<br>` 污染 | 公式片段里不出现被硬换行转换吃进去的 `\<br>`（整条公式会崩） |
+| 公式 text 命令已规范化 | 产物必须是 `postprocess._normalize_mathjax_text` 的**不动点**：`\text{}`/`\texttt{}` 里的 `\_`、`\,`、嵌套 text 命令、`{\bf …}` 会被 MathJax 原样显示且不报错，书稿新增这类写法时这里报出第一处差异 |
+| 伪数学 span 无 LaTeX 残留 | 没有 `$`/`\(` 定界符的 `<span class="math inline">`（表格单元格产物，约 880 个）MathJax 不处理，混进 `\X` 会字面漏出且任何渲染检查都抓不到 |
+| 英译词典匹配产物 | 页面含中文的代码块/公式节点必须命中词典、词典 key 必须存在于页面（pandoc 版本漂移会让公式词典整体错配） |
+| 仓库按钮已渲染 | 每页右上角（面包屑行右侧）都有 `xlite-dev/LeetCUDA` 仓库按钮，链接与 `convert/readme.py` 的 `REPO_URL` 一致 |
+| 下载 PDF 按钮已渲染 | 每页都有该按钮（默认挨着「下一页」，无按钮行的页面落侧栏），且链接与根 README 的 `[leetcuda-pdf]` 一致 |
+| TikZ 图保留文字 | 有文字的片段必须真的输出字形（防陈旧/残缺 SVG 留在页面上） |
+| 英文图集完整 | 词典覆盖、英文 SVG 数量与字形（`_static/figures-en/`） |
+| 书目录编号核对 | 本地有 `<书>.toc`（主书 `book.toc`、集合 `cute-zhihu.toc`）时，逐章比对章号 + 标题 |
+| 集合已装配且入口在附录之后 | 按 `build/collections.json` 核对集合首页/篇页/章节页齐全，且主书侧栏里的入口排在所有 `part-N` 之后 |
+
+## 改 TikZ 编译路径时的等价验收
+
+`convert.verify` 的「TikZ 图保留文字」只判断「SVG 里有没有字形」，图张三李四互换它照样全绿；`visual_check` 只抓 MathJax 报错与版式溢出，也不比对图形。**动过 `tikz2svg.py` 的编译路径（模板、批量、dvisvgm 参数、拆页方式）后，唯一能证明产物没变的是下面这套结构等价比对**，别只看核对全绿。
+
+```bash
+# 1. 先用改动前的代码留一份参考产物（约定：改代码前先跑，否则基线不可信）
+python -m convert --force-tikz --jobs 4
+cp build/src/figures-gen/*.svg /tmp/svg-old-zh/ && cp _static/figures-en/*.svg /tmp/svg-old-en/
+# 2. 改完再全量编一次，然后比对
+python -m convert --force-tikz --jobs 4
+```
+
+判定口径（**不能拿 md5 判**：`<defs>` 里的 glyph 编号随字形出现顺序变，`id='g3-1'` 会变成 `id='g3-4'`，路径与坐标不变）：
+
+| 维度 | 要求 |
+| --- | --- |
+| 文件名集合与数量 | 完全一致（主书 226、英文图集 195） |
+| `width` / `height` / `viewBox` | 三元组完全相同 |
+| `<path d='…'>` 的几何数据集合（排序后） | 相同 |
+| `<use x= y=>` 的放置坐标集合（排序后） | 相同 |
+| 元素数量 | 相同 |
+
+配套再做一次**回退演练**：临时在 `_template(head, multi=True)` 里注入 `\undefinedcmd`，跑 `--only` 几章，预期日志逐批报出 `! Undefined control sequence.`、`report.mode` 变成 `batchN+fallbackM`、最终 `失败 0`（逐片重编救回来了），然后撤销注入。这一条验的是「批失败不会把整站搞挂」。
+
+## 浏览器验收（visual_check）
+
+```bash
+pip install playwright && python -m playwright install chromium   # 一次性
+python tools/visual_check.py --html build/html --out build/shots/chapters \
+    --proxy http://localhost:7890          # 无代理时省略 --proxy
+python tools/visual_check.py --only index,cute-zhihu/index,ch00-profiling --out build/shots  # 只验几页
+    --sheet build/shots/sheet.png          # 把截图拼成接触表，便于肉眼过一遍排版
+```
+
+用 `python tools/visual_check.py` 而不是 `python -m tools.visual_check`：cdit 环境的 site-packages 里有个同名的 `tools` 包，`-m` 会命中它并报 `No module named tools.visual_check`。
+
+页面枚举是递归的（`rglob`），主书与子集合的所有页面一起验（当前 93 页）；页面标识用 docname（`cute-zhihu/reed-01-layout`），截图名把 `/` 换成 `__`，`--only` 同时接受 docname 与裸文件名。
+
+流程：逐页打开、等 MathJax 渲染完，然后统计公式报错（`mjx-merror` 的 TeX 报错原文）、**公式渲染文本里的反斜杠残迹**（取 `mjx-assistive-mml` 的文本扫 `\X`——text mode 里 MathJax 不认的写法会原样显示且不报错，只能在这里兜底）、可见的字面残迹（排除代码块与公式容器）、控制台报错、404 资源，并量一遍版式几何，最后整页截图留档。公式与字体走 CDN，验收机需要能出网（否则用 `--proxy`）。
+
+## 本地预览
+
+```bash
+conda activate cdit && cd /workspace/dev/vipshop/LeetCUDA/docs/readthedocs
+./build.sh
+python -m http.server -d build/html 8000   # 或直接双击 build/html/index.html
+```
+
+## 远程 SSH 开发的预览（VS Code 内置浏览器）
+
+站点产物是静态 HTML，远程开发时本机浏览器打不开服务器上的 `build/html`。
+
+```bash
+python -m http.server -d build/html 8000    # 在远端跑着；改完重跑 build.sh 刷新页面即可
+```
+
+`Ctrl/Cmd+Shift+P` → **`Simple Browser: Show`**（中文「简单浏览器：显示」）→ URL 填 `http://localhost:8000`。
+
+**必须先转发端口**：内置浏览器和普通浏览器一样在**你本机**渲染，`localhost` 指的是你的电脑、不是远程服务器；没转发就是 `ERR_CONNECTION_REFUSED`。两种转发方式：
+
+- **端口面板**：`Ctrl/Cmd+Shift+P` → `Ports: Focus on Ports View`（或底部面板「端口 / PORTS」标签页）→「转发端口 / Forward a Port」→ 填 `8000`，然后按面板里 **本地地址 / Local Address** 那一列打开——本机 8000 被占用时 VS Code 会改用 8001 之类，别照抄 8000。
+- **在集成终端里起服务**：把 `http.server` 放到 VS Code 集成终端跑，端口检测会自动把它加入端口面板并转发。**由脚本在后台起的服务检测不到，必须手动转发**（这正是打开 `localhost:8000` 报 `ERR_CONNECTION_REFUSED` 的原因）。
+
+直接访问服务器网卡地址（如 `http://10.99.177.11:8000`）通常走不通（办公网、安全组拦截）：现象是页面先空白、随后 `ERR_CONNECTION_TIMED_OUT`。**判断依据在服务端**——`http.server` 的访问日志里压根没有这次请求，说明流量没到站点、不是页面问题；这种情况只能走端口转发。
+
+另一条零网络兜底（连不到 8000 时）：仓库里装了 `Preview`（`searking.preview-vscode`，支持 HTML），在编辑器里打开 `build/html/index.html` 后 `Ctrl/Cmd+Shift+P` → **`Open Preview`**（中文「打开预览」），由本机 VS Code 渲染，不经网络。注意它加载 `_static/` 相对资源的行为视实现而定，样式可能不全——要完整样式还是走端口转发。
+
+两点限制：内置浏览器只认 http(s)，`file://` 打不开（`translate.js` 也会按 `file:` 判定「站点不可被 Google 抓取」而禁用中英切换）；公式与字体走 CDN（`cdn.jsdelivr.net`），内网机器上页面只显示 TeX 源码、图注字体退化，这是环境限制、不是转换出错。
+
+## 改核对项
+
+新增检查写进 `convert/verify.py`：实现 `check_xxx(...) -> tuple[bool, str]`，在 `verify()` 里 `report.add("中文检查项名", ok, detail)`，必要时在 `main()` 里接参数。`build.sh` 与 RTD 的 `post_build` 都直接调 `python -m convert.verify`，不需要改别的地方。

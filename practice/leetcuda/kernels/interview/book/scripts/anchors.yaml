@@ -1,0 +1,500 @@
+# anchors.yaml — LeetCUDA 成书源码冻结登记（RFC-A.3）
+# 登记后源文件零改动（BOOK_PLAN §5.3）；校验脚本 verify_anchors.py
+frozen_at: "2026-11-16"
+repo_commit: "5b618f24651d764fb6cd9d162f1ecf75318aeece"
+files:
+  base.cuh:
+    sha256: cda419930ad0a0670f0695372a8599f398ac7b48479e5fcb317262b5dc232ac0
+    lines: 909
+  common.cuh:
+    sha256: f707fede6a55d258962fbd9c314e65c8f741f32bf161749e10b59e75e4d384d9
+    lines: 803
+  sgemv.cuh:
+    sha256: 5c539154353996e0bd51650bf03dde239e3133349ada31ba345ab14f05b25c2a
+    lines: 102
+  sgemm.cuh:
+    sha256: 50b9d7b42d6be8ed0b05fe8c1bc4921c0e1ea90bc62681fc130e89aef37fa5e1
+    lines: 434
+  hgemm.cuh:
+    sha256: 40e330514d004bfd7e2330dea941a9d75922efca75d93db443373714ae503324
+    lines: 2100
+  flash_attn.cuh:
+    sha256: d01c02e57b1ab0293b87c462ecb5b2d52c7092fd41c11c4f06b3ec9d916a20a4
+    lines: 4179
+  ffpa_attn.cuh:
+    sha256: f5d6db34b8c7176bc8d74088692ecc82aec69d10a6946dcfc0d5fad1852b1b2b
+    lines: 1307
+  fp8_gemm.cuh:
+    sha256: 60ef4408cfac016fa4b6cf3db8cec1d29b54665a294967290e07d4ce54ce7ce2
+    lines: 958
+  fp4_gemm.cuh:
+    sha256: fcdeb7263a2a3fe7fc81c029afcc643485b705f09141a29f20728907f0705c9e
+    lines: 1298
+  # 多 TU 拆分（2026-09-28）：host 侧 test/bench 从 notes-v2.cu 拆入模块 .cu；
+  # 2026-09-29 迁入 bench/ 目录，notes-v2.cu 改名 bench/bench_leetcuda.cu
+  bench/bench_leetcuda.cu:
+    sha256: 3ab6514e6c61da2a6344ff0569b0bbf72d8517e7490277390f5c2583e2718dbb
+    lines: 440
+  bench/base.cu:
+    sha256: df8146dfe41612b2ef07afdb23a045b2ffe08b7b5bd51045252860ed7cb263f8
+    lines: 730
+  bench/sgemv.cu:
+    sha256: 262dcd716333aa14e853da7c3ed6bbb3726aeefe2cb845d64acaa1ead41d32f9
+    lines: 117
+  bench/sgemm.cu:
+    sha256: 9a295d4a5940a06487cd9d84742ebe27ca8e32e3ee6fd785051d20517fbc3b5e
+    lines: 145
+  bench/hgemm.cu:
+    sha256: 19b3270b91f87b55d6ec9661621faacb9dec8af83782ae24097ebbea1c339610
+    lines: 1187
+  bench/fp8_gemm.cu:
+    sha256: ac893e4647585764067a9f95a020fe39d3fda9bcb1f9bdd03b24ea04e5a94aaa
+    lines: 466
+  bench/fp4_gemm.cu:
+    sha256: b7261c8425e8e768709d554d62e98c6e05fa14ddd7386982f4f11c6ffcba7f49
+    lines: 594
+  bench/flash_attn.cu:
+    sha256: 724185bcbc43b0d33c4b7855f3010b4590abe435255edffe2e7e81543a9a01c9
+    lines: 2695
+  bench/ffpa_attn.cu:
+    sha256: 7492129c88d473cc6f046662e52be98b2cd3879bf440c7be39969124ce42ad19
+    lines: 415
+  bench/utils.cu:
+    sha256: a03c499f94ce01f9b5cdf8a18ccdab88ab1d53e95a8cbbdf0a2d02d69dc9b35c
+    lines: 83
+  collective_gemm.cuh:
+    sha256: 4ec25ddaab5483323d325a7276cf141b35fe7eb0ad6201c4ea955d849d43f187
+    lines: 93
+chapters:
+  ch01:
+    refs:
+      - file: base.cuh
+        start: 1
+        end: 86
+        first_anchor: "#pragma once"
+        last_anchor: ""
+  ch02:
+    refs:
+      - file: base.cuh
+        start: 87
+        end: 305
+        first_anchor: "// ============================================================================="
+        last_anchor: ""
+  ch03:
+    refs:
+      - file: base.cuh
+        start: 306
+        end: 386
+        first_anchor: "// ============================================================================="
+        last_anchor: ""
+  ch04:
+    refs:
+      - file: base.cuh
+        start: 520
+        end: 665
+        first_anchor: "// ============================================================================="
+        last_anchor: ""
+  ch05:
+    refs:
+      - file: base.cuh
+        start: 387
+        end: 519
+        first_anchor: "// ---- Merge Attn States: 合并 Split-KV Attention 的部分结果 ----"
+        last_anchor: ""
+  ch06:
+    refs:
+      - file: base.cuh
+        start: 666
+        end: 801
+        first_anchor: "// ============================================================================="
+        last_anchor: ""
+  ch07:
+    refs:
+      - file: base.cuh
+        start: 802
+        end: 909
+        first_anchor: "// ============================================================================="
+        last_anchor: "// ============================================================================="
+  ch08:
+    refs:
+      - file: sgemv.cuh
+        start: 1
+        end: 102
+        first_anchor: "#pragma once"
+        last_anchor: "// ============================================================================="
+  ch09:
+    refs:
+      - file: sgemm.cuh
+        start: 6
+        end: 183
+        first_anchor: "// sgemm.cuh: Phase 7a SGEMM"
+        last_anchor: ""
+  ch10:
+    refs:
+      - file: sgemm.cuh
+        start: 184
+        end: 434
+        first_anchor: "// ============================================================================="
+        last_anchor: "// ============================================================================="
+  ch11:
+    refs:
+      - file: hgemm.cuh
+        start: 3
+        end: 397
+        first_anchor: "// hgemm.cuh: Phase 7b-d HGEMM (MMA/Swizzle/CuTe/WGMMA/TMA_MMA_WS)"
+        last_anchor: ""
+  ch12:
+    refs:
+      - file: hgemm.cuh
+        start: 399
+        end: 716
+        first_anchor: "// Phase 7b-3: HGEMM MMA — m16n8k16 + multistage pipeline + TN 布局 + XOR swizzle"
+        last_anchor: ""
+      - file: common.cuh
+        start: 110
+        end: 348
+        first_anchor: "// Phase 7b-3: HGEMM MMA Swizzle — m16n8k16 + multistage pipeline + TN 布局"
+        last_anchor: "// v1/v2 等价性由 host 端 test_swizzle_equiv (--swizzle-eq-check) 验证."
+  ch13:
+    refs:
+      - file: hgemm.cuh
+        start: 1428
+        end: 1857
+        first_anchor: "#if defined(NOTES_V2_ENABLE_WGMMA)"
+        last_anchor: "#endif /* NOTES_V2_ENABLE_WGMMA */"
+      - file: common.cuh
+        start: 350
+        end: 803
+        first_anchor: "#if defined(NOTES_V2_ENABLE_WGMMA) || defined(NOTES_V2_ENABLE_TMA_MMA_WS)"
+        last_anchor: "#endif /* NOTES_V2_ENABLE_WGMMA || NOTES_V2_ENABLE_TMA_MMA_WS */"
+  ch14:
+    refs:
+      - file: hgemm.cuh
+        start: 1859
+        end: 2100
+        first_anchor: "#if defined(NOTES_V2_ENABLE_TMA_MMA_WS)"
+        last_anchor: "#endif /* NOTES_V2_ENABLE_TMA_MMA_WS */"
+      - file: common.cuh
+        start: 467
+        end: 517
+        first_anchor: "// Warpgroup-level register rebalancing for warp specialization."
+        last_anchor: "}"
+  ch15:
+    refs:
+      - file: flash_attn.cuh
+        start: 5
+        end: 110
+        first_anchor: "// Phase 8: FlashAttention-2  + MMA m16n8k16)"
+        last_anchor: "const int kPadV>             // V row padding; 0 selects compact XOR swizzle"
+  ch16:
+    refs:
+      - file: flash_attn.cuh
+        start: 5
+        end: 790
+        first_anchor: "// Phase 8: FlashAttention-2  + MMA m16n8k16)"
+        last_anchor: ""
+  ch17:
+    refs:
+      - file: flash_attn.cuh
+        start: 792
+        end: 1440
+        first_anchor: "// Phase 8b: FlashAttention-2 TMA + MMA Warp Specialization (SM120)"
+        last_anchor: "// ============================================================================="
+  ch18:
+    refs:
+      - file: flash_attn.cuh
+        start: 1441
+        end: 2192
+        first_anchor: "// Phase 8c: FlashAttention-3-style TMA + MMA Warp Specialization (SM120)"
+        last_anchor: "}"
+  ch19:
+    refs:
+      - file: ffpa_attn.cuh
+        start: 1
+        end: 641
+        first_anchor: "#pragma once"
+        last_anchor: ""
+  ch20:
+    refs:
+      - file: hgemm.cuh
+        start: 788
+        end: 820
+        first_anchor: "// Phase 7c-1: CuTe HGEMM Kernel — TN 布局 + Smem Swizzle + Multistage Pipeline"
+        last_anchor: "const int BlockSwizzle = 0>      // 1 enables 3D grid swizzle for L2 locality"
+  ch21:
+    refs:
+      - file: hgemm.cuh
+        start: 821
+        end: 1196
+        first_anchor: "__global__ void hgemm_mma_stages_tn_cute(T *Aptr, T *Bptr, T *Dptr, int m,"
+        last_anchor: "// ============================================================================="
+  ch22:
+    refs:
+      - file: ffpa_attn.cuh
+        start: 31
+        end: 79
+        first_anchor: "namespace fa_cute {"
+        last_anchor: "#if defined(NOTES_V2_ENABLE_CUTE)"
+  ch23:
+    refs:
+      - file: hgemm.cuh
+        start: 1232
+        end: 1270
+        first_anchor: "auto BM = Int<128>{};"
+        last_anchor: "// auto tCrA = thr_mma.partition_fragment_A(gA(_,_,0)); // (MMA, MMA_M, MMA_K)"
+  ch24:
+    refs:
+      - file: hgemm.cuh
+        start: 718
+        end: 1427
+        first_anchor: "// Phase 7c: HGEMM CuTe — CUTLASS CuTe DSL 实现（SM80+, Tensor Core 全自动调度）"
+        last_anchor: "#endif /* NOTES_V2_ENABLE_CUTE */"
+  ch25:
+    refs:
+      - file: flash_attn.cuh
+        start: 2196
+        end: 3488
+        first_anchor: "#if defined(NOTES_V2_ENABLE_CUTE)"
+        last_anchor: "#endif // NOTES_V2_ENABLE_CUTE"
+  ch26:
+    refs:
+      - file: ffpa_attn.cuh
+        start: 30
+        end: 65
+        first_anchor: "#if defined(NOTES_V2_ENABLE_CUTE)"
+        last_anchor: "#endif // NOTES_V2_ENABLE_CUTE"
+      - file: ffpa_attn.cuh
+        start: 79
+        end: 375
+        first_anchor: "#if defined(NOTES_V2_ENABLE_CUTE)"
+        last_anchor: "#endif // NOTES_V2_ENABLE_CUTE"
+      - file: ffpa_attn.cuh
+        start: 377
+        end: 640
+        first_anchor: "#if defined(NOTES_V2_ENABLE_CUTE) && defined(NOTES_V2_ENABLE_TMA_MMA_WS)"
+        last_anchor: "#endif // NOTES_V2_ENABLE_CUTE && NOTES_V2_ENABLE_TMA_MMA_WS"
+  ch26b:
+    refs:
+      - file: flash_attn.cuh
+        start: 3490
+        end: 4177
+        first_anchor: "#if defined(NOTES_V2_ENABLE_CUTE)"
+        last_anchor: "#endif // NOTES_V2_ENABLE_CUTE"
+  ch26c:
+    refs:
+      - file: ffpa_attn.cuh
+        start: 643
+        end: 1306
+        first_anchor: "// FFPA Split-D non-WS TMA 版 (ffpa-attn split_d.cuh 移植, 最小教学集)"
+        last_anchor: "#endif // NOTES_V2_ENABLE_CUTE && NOTES_V2_ENABLE_TMA_MMA_WS"
+      - file: bench/ffpa_attn.cu
+        start: 136
+        end: 268
+        first_anchor: "// non-WS TMA split-D bench: tile 128x128, tid=0 内联发 TMA, STSM+TMA store。"
+        last_anchor: "}"
+  ch34:
+    refs:
+      - file: fp8_gemm.cuh
+        start: 49
+        end: 300
+        first_anchor: "// ============================================================================="
+        last_anchor: "}"
+  ch35:
+    refs:
+      - file: fp8_gemm.cuh
+        start: 302
+        end: 957
+        first_anchor: "// ============================================================================="
+        last_anchor: "}  // namespace fp8_gemm"
+  ch36:
+    refs:
+      - file: fp4_gemm.cuh
+        start: 55
+        end: 393
+        first_anchor: "namespace fp4_gemm {"
+        last_anchor: "}"
+  ch39:
+    refs:
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 62
+        end: 100
+        first_anchor: "struct QuantizeTraits {"
+        last_anchor: "using S2RCopyB = Copy_Atom<SM75_U16x8_LDSM_T, Element>;"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 280
+        end: 306
+        first_anchor: "template <class TiledMma, class CopyA>"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 185
+        end: 223
+        first_anchor: "static __device__ __forceinline__ void quantize_group(PackedBF16 tmp0, PackedBF16 tmp1,"
+        last_anchor: "quantize_float4_fp8(make_float4(scale[0], scale[1], scale[2], scale[3]));"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 224
+        end: 263
+        first_anchor: "// Each lane first places its E2M1 pair in one of four byte positions. XOR shuffles then OR"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_uni.cu
+        start: 87
+        end: 113
+        first_anchor: "// SM80_16x8x16_F32BF16BF16F32_TN has BLayout"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 405
+        end: 423
+        first_anchor: "template <class TiledMma, class RawA, class Acc>"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 730
+        end: 745
+        first_anchor: "// Cooperative epilogue. Each thread sums the declared buffers for one logical D element, converts"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/quantize/quantize_impl.cuh
+        start: 821
+        end: 845
+        first_anchor: "template <int kRankTiles, int kWarps = 8, int kMaxSlices = 2, bool kAsyncA = true>"
+        last_anchor: "}"
+  ch40:
+    refs:
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cuh
+        start: 332
+        end: 355
+        first_anchor: "using MmaAtom ="
+        last_anchor: "\"one rank tile must be a whole number of BF16 MMA atoms\");"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cuh
+        start: 375
+        end: 393
+        first_anchor: "// D/L1 use swizzle-free row-major linear layouts and independent TMA descriptors. They share"
+        last_anchor: "LoraSmemAtom{}, make_shape(Int<kBN>{}, Int<kRankTile>{}, Int<kStages>{})));"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cuh
+        start: 439
+        end: 454
+        first_anchor: "static_assert(kDStageBytes == kAStageBytes, \"a D rank tile must overlay one A stage\");"
+        last_anchor: ": static_cast<uint32_t>(kDStageBytes + kL1StageBytes);"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cuh
+        start: 838
+        end: 857
+        first_anchor: "#pragma unroll 1"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cuh
+        start: 685
+        end: 698
+        first_anchor: "for (int i = 0; i < size(tCrD); ++i) {"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cuh
+        start: 931
+        end: 956
+        first_anchor: "template <class GmemC, class CSlice, class TiledMma, class Acc>"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/svdq/cute/fp4/gemm/gemm_w4a4.cu
+        start: 156
+        end: 173
+        first_anchor: "if (N % 256 == 0 && K % 128 == 0) {"
+        last_anchor: "}"
+  ch37:
+    refs:
+      - file: fp4_gemm.cuh
+        start: 395
+        end: 1297
+        first_anchor: "// ============================================================================="
+        last_anchor: "}  // namespace fp4_gemm"
+  ch41:
+    refs:
+      - file: collective_gemm.cuh
+        start: 31
+        end: 53
+        first_anchor: "using TileShape = cute::Shape<cute::_128, cute::_128, cute::_64>;"
+        last_anchor: "using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;"
+      - file: collective_gemm.cuh
+        start: 65
+        end: 89
+        first_anchor: "using StrideA = typename Gemm::GemmKernel::StrideA;"
+        last_anchor: "return status;"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 145
+        end: 155
+        first_anchor: "template <class CtaTileShapeMNK, class ElementOutput, class ElementCompute, class ElementBias>"
+        last_anchor: "128 / cute::sizeof_bits_v<ElementBias>>>;"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 363
+        end: 376
+        first_anchor: "using Fp8RowEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<"
+        last_anchor: "using Fp8RowGemm = cutlass::gemm::device::GemmUniversalAdapter<Fp8RowGemmKernel>;"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 438
+        end: 458
+        first_anchor: "using Fp8BlockScaleConfig ="
+        last_anchor: "using Fp8BlockGemm = cutlass::gemm::device::GemmUniversalAdapter<Fp8BlockGemmKernel>;"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 504
+        end: 518
+        first_anchor: "FusionArguments fusion_args{};"
+        last_anchor: "};"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 547
+        end: 569
+        first_anchor: "auto stride_a = cutlass::make_internal_packed_stride(StrideA{}, {M, K, 1});"
+        last_anchor: "{fusion_args, out_ptr, stride_c, out_ptr, stride_d},"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 94
+        end: 122
+        first_anchor: "// PyTorch's approximate=\"tanh\" GELU, including its operation order."
+        last_anchor: "};"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 192
+        end: 214
+        first_anchor: "// D = activation(bias + b_scale * (a_scale * accumulator)). The inner tree still"
+        last_anchor: "Sm90Fp8RowColScaleBias<CtaTileShapeMNK, ElementOutput, ElementCompute, ElementBias>>;"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh
+        start: 378
+        end: 402
+        first_anchor: "template <template <class> class ActivationFn>"
+        last_anchor: "cutlass::gemm::device::GemmUniversalAdapter<Fp8RowActivationGemmKernel<ActivationFn>>;"
+      - file: ../../../cache-dit/csrc/kernels/fp8/gemm/per_row.cu
+        start: 14
+        end: 27
+        first_anchor: "void launch_fp8_gemm_per_row_activation(const void* a, const void* b, const float* a_scale,"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/fp8/quantize.cu
+        start: 382
+        end: 404
+        first_anchor: "struct SwigluInput {"
+        last_anchor: "};"
+      - file: ../../../cache-dit/csrc/kernels/fp8/quantize.cu
+        start: 406
+        end: 434
+        first_anchor: "template <bool kCacheInput>"
+        last_anchor: "}"
+      - file: ../../../cache-dit/csrc/kernels/fp8/quantize.cu
+        start: 448
+        end: 463
+        first_anchor: "const float safe_scale = amax == 0.0f ? 1.0f : amax / kE4M3Max;"
+        last_anchor: "}"
+      - file: ../../../cache-dit/src/cache_dit/quantization/fp8/fused.py
+        start: 73
+        end: 104
+        first_anchor: "def fused_swiglu_mlp("
+        last_anchor: "return down.forward_quant(qx, sx, x.shape[:-1])"
+      - file: ../../../cache-dit/csrc/kernels/fp4/gemm.cuh
+        start: 214
+        end: 239
+        first_anchor: "using Fp4CutlassElementA = cutlass::nv_float4_t<cutlass::float_e2m1_t>;"
+        last_anchor: "using Fp4CutlassGemm = cutlass::gemm::device::GemmUniversalAdapter<Fp4CutlassGemmKernel>;"
+      - file: ../../../cache-dit/csrc/kernels/fp4/gemm.cuh
+        start: 287
+        end: 320
+        first_anchor: "const int M = static_cast<int>(a.size(0));"
+        last_anchor: "{fusion_args, out_ptr, stride_c, out_ptr, stride_d},"
+      - file: ../../../cache-dit/csrc/kernels/fp4/quantize.cuh
+        start: 69
+        end: 82
+        first_anchor: "// Byte address of scale (row=mn, K16 group=s) in the canonical buffer."
+        last_anchor: "}"
+  appA:
+    refs:
+      - file: common.cuh
+        start: 1
+        end: 803
+        first_anchor: "#pragma once"
+        last_anchor: "#endif /* NOTES_V2_ENABLE_WGMMA || NOTES_V2_ENABLE_TMA_MMA_WS */"

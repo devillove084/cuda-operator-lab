@@ -1,0 +1,75 @@
+# 踩坑与实测结论
+
+下面每一条都是实测否定过的路线或踩过的坑（附页面上可见的症状），按层面分组。改转换器前先扫一眼，能省一次全量构建。
+
+## TikZ → SVG
+
+1. **不能让 dvisvgm 直接读 xelatex 的 XDV**：CJK 字形推进量解析不可靠，图中文字会互相重叠（两种字号模式都一样乱）。同一份内容先转 PDF 再读就完全正确，所以一律 `dvisvgm --pdf`。
+2. **不能直接让 dvisvgm 读多页 PDF**：PDF 输入的 `--bbox` 选项无效，每张 SVG 都是整页大小、图形缩在左上角。多页文档必须先 `pdfseparate` 拆成单页 PDF 再逐页转，页尺寸才等于各自图形外接框——批量编译（`\documentclass[border=6pt,multi=tikzpicture]{standalone}`）走的就是这条路：单片编译 99% 的时间花在导言区（fontspec/ctex/Noto 字体加载），拼批后全量 421 张从 123s 降到 32s（RTD 上 388s → 约 60s）。三条约束：片段必须各自只有一个 `tikzpicture`（多一页就整批回退）；整批 xelatex 失败 / 页数不符 / 进程池崩溃时，由**主进程**逐片重编（不能在 worker 里回退，否则它独占、其余 worker 空转），错误仍定位到具体片段；产物字节与单片编译**不同**——`<defs>` 里 glyph 编号随字形出现顺序变（`id='g3-1'` → `id='g3-4'`），**比对必须用结构等价（尺寸三元组 + `<path d>` 集合 + `<use>` 坐标），不能拿 md5 判**。
+3. **失败必须删旧产物，且缓存只记成功**：否则上一轮的残缺 SVG 留在页面上，报告还是「失败 0」。再加一道交叉核对——「PDF 里有文字 ⇒ SVG 里必须有字形」，把「dvisvgm 退出码为 0 但没写出字形」也当失败。
+4. **图内 `\ref` 要用全书注册表替换成编号**：片段是单独编译的孤立文档，label 不存在，LaTeX 只能渲染成 `??`（书里流程图会写「接决策树图~\ref{fig:...}」）。
+5. **`--tikz-fonts` 两种模式**：
+
+   | 模式 | 226 图合计 | 浏览器 | VS Code 预览 | 图中文字可选中 |
+   | --- | --- | --- | --- | --- |
+   | `paths`（默认） | 21 MB | 正常 | 正常 | 否 |
+   | `woff2` | 约 5 MB | 正常 | 乱码 | 是 |
+
+   两者都不丢视觉信息，`paths` 只是把字形转成矢量轮廓。缓存键含模式，切换会自动重编。
+
+## 公式（pandoc → MyST → MathJax）
+
+6. **数学区里的 `\ref` 不能变成链接**：`\xrightarrow[\text{第\ref{ch:35}章…}]{…}` 会被渲染成 Markdown 链接塞进公式，MathJax 直接解析失败（页面上留半截公式加一串链接文本）。数学区内的引用一律直接写编号。
+7. **显示公式必须独占段落、`$$` 独占行**：源里 `equation` 环境常紧贴正文（`…所以 \begin{equation}`），也有直接写 `$$…$$` 与 `\[…\]` 的，pandoc 会就地输出成段中的 `$$…$$`，而 MyST 只认「`$$` 独占行」这一种跨行写法，否则拆成「字面 `$` + 行内公式 + 字面 `$`」。预处理做三道隔离，后处理再把定界符规范到独占行。
+8. **公式里的空行会把公式截断**：书里 `align` 环境内部有空行，MyST 的 `$$…$$` 必须同段，否则公式垮掉（ch19b 有三处）。
+9. **`\text{…$…$…}` 的嵌套 `$`**：MyST 会把它切成两个数学节点，MathJax 报 "Extra close brace or missing open brace"。内层改 `\(…\)`（实测 MathJax 在 `\text{}` 里能正常渲染）；`\text{\color{red}$X$}` 这类改写成 `\textcolor{red}{X}`。
+10. **书内数学宏要喂给 MathJax**：见 `pipeline.md` 的「书内数学宏」，否则 `\v{L}` 会变成重音 `Ľ`。
+11. **过宽显示公式会撑出整页横向滚动条**：MathJax 给这类公式写内联 `min-width`（CSS 里 min-width 压过 max-width），必须 `min-width: 0 !important` 覆盖后让它在容器内滚动。
+
+## 正文与结构
+
+12. **`\begin{center}` 会变成 fenced div `::: center`**：MyST 的 colon fence 把它当指令开头，后面整段内容被吞成字面文本（ch01 的两张图就是这样丢的）。现在预处理剥掉纯排版包装环境，后处理再兜底转义行首 `:::`。
+13. **pandoc 的原始 HTML 残迹**：`$\ge$` 与数字之间的 `` `<!-- -->`{=html} `` 会被当行内代码原样显示（全站 356 处）。另外注意围栏判断——`{admonition}` 这类指令围栏里是正常 markdown，只有 `{code-block}` 才是逐字代码。
+14. **`\shortstack{…\\…}` 的 `\\` 会被当成表格换行**：全书 77 处，一行被拆成两行空壳；压平成单行文本。
+15. **`\cmidrule` 只删参数、别删命令**：pandoc 不认识它的参数，会把 `\cmidrule(lr){2-3}` 的参数变成一格内容；但整条命令删掉，pandoc 就失去「表头到此为止」的判断依据，整张表的 `<thead>` 会消失（ch33/ch35/ch37 共 4 张表）。表头行数由预处理写进 TABLE token，后处理据此把多行表头收进 `<thead>`。
+16. **表格统一交给 pandoc 出 HTML**：四种 Markdown 表格（grid/simple/multiline/pipe）全关。pipe 表会被 Markdown 吃掉反斜杠——单元格里 `\begin{bmatrix}a \\ b\end{bmatrix}` 渲染出来只剩一个 `\`，公式直接废掉。
+17. **raw HTML 表格里不解析 Markdown**：跨章引用、图片、强调都会漏成字面文本（整串 `[31](ch35-…#ch-35 "…")`、单元格里的 `!插图`）。转换器把表格内的行内语法转成 HTML；表格图片改用 `_images/` 并在页尾补一个隐藏的 docutils 图片节点，让 Sphinx 真去搬运文件（raw HTML 的 `<img>` 它不管，否则 404）。
+18. **`>{$}c<{$}` 列声明会让 pandoc 丢表**：array 宏包的「整列数学模式」与 `\shortstack` 同现时整张表消失；即使侥幸出表，`\v{L}` 也会被当重音渲染成 `Ľ`。现在展开成普通列声明 + 逐格 `$…$`（语义等价）。
+19. **`\[…\]` 隔离的正则要排除 `\\[2pt]`**：那是 LaTeX 的换行加间距命令，误匹配会把整段括进公式。
+20. **注释与 verbatim 的边界**：被注释掉的 `\input` 不该展开（会抛文件不存在），但也不能整体剥注释——`\verb|…%…|` 里的 `%` 会被误当注释起点，只跳过被注释的 `\input`。
+21. **图片宽度的属性语法**：`![插图](x.svg){width=95%}` 里**不带引号的百分比值 MyST 解析不了**，会原样漏出 `{width=95%}`（全站 25 张图都中招，页面上图下方多一行 `{width=95%}`）；加引号（`{width="95%"}`）能解析，但会给图片套一层指向自身的链接。带宽度的图现在统一走 `{image}` 指令（`:width: 95%` → `style="width: 95%;"`），它仍是 docutils 图片节点，Sphinx 照常把文件搬进 `_images/`。
+22. **`\\` 硬换行会漏成可见反斜杠**：书里用 `\\` 强制换行（面试速查的 `Q：…？\\ A：…` 那种），pandoc 输出成「行尾反斜杠 + 换行」；合行时若把换行并成空格，就得到 `…cuDNN？\ A：…`——反斜杠在 HTML 里是可见字符（CommonMark 的 `\ ` 不是转义，空格不属于可转义标点）。合行前先把行尾反斜杠转成 `<br>`（全站 270 处、27 页），段尾多出来的 `<br>` 再去掉。
+
+    这个转换**绝不能进公式**：公式里的 `\\` 是 bmatrix/align 的行分隔，被吃成 `\<br>` 后 MathJax 报 "Undefined control sequence"（站点开了 noundefined 扩展，页面上是红字 `\<` + 字面 `br>`，或整条公式变成 `[Math Processing Error]` 框），bmatrix 表、对齐块全废——ch19b 的视图对照表与布局代数式、ch25 的 MMA fragment 记法都中过招。公式保护有三处容易漏（都实测翻车过）：
+    - **跨行行内公式**：只保护单行 `$…$`（`\$[^$\n]*\$`）挡不住跨行形态。表格 `>{$}c<{$}` 列里的多行 bmatrix（wp2）、tex 源码在公式内行尾续行（ch25 L257）都是跨行；正确做法是用 `texutil.math_spans` 整段保护，行内公式跨行时把内部换行折成单空格（TeX 里换行等价空格），`\\` 原样保留。
+    - **公式内空行切段**：合并公式内空行（`_collapse_math_blank_lines`）必须跑在段落切分**之前**——按空行切段会把 `$$…$$` 块切碎，碎片失去定界符后不再受保护（ch19b 的 align 案例）。
+    - **HTML 表格续行**：`_BLOCK_LINE_RE` 只保护以 `<tag` 开头的整行，表格单元格内公式的续行不在保护范围；公式先保护就能覆盖，但要注意表格整行保护会**嵌套**包住公式占位符，占位符恢复得循环到不动点（单遍 `re.sub` 不重扫替换文本）。
+
+    验收侧配了 `check_math_foreign_markup`（公式片段内出现 `<br` 即红）；`check_hard_breaks` 核对前会把公式与 HTML 表格 mask 掉，所以它**抓不到**这类污染，别指望它兜底。词典侧有个连带坑：公式一旦被污染，`tools.code_dict` 抽取的 key 就带着污染形态进 `_static/math-en.js`；修好转换器后必须重跑产线对账（`extract` → 复用旧译文 → `merge`），否则 `英译词典匹配产物` 必红。另：`code_dict.py` 的 `merge --what math` 路径曾因缺 `import re` 直接崩，别以为词典只能手工维护。
+23. **强调标记在中英混排下会配不上对**：CommonMark 要求闭合 `**` 是 right-flanking；`**…输出。**见` 里闭合标记前是标点、后是汉字，判定失败，两个 `**` 原样漏到页面上（实测全站 2854 处强强调里 900 处如此；开启侧同理，`中**（强调）**` 的开启标记前是汉字、后是标点）。转换器按 flanking 规则**只把配不上的对**改成 `<strong>`/`<em>`（与字符集无关），配得上的保持 Markdown——页脚那种「`*…链接…*`」的写法因此不受影响（实测 MyST 在行内 HTML 里仍会解析 `$…$` 与链接，所以即便改也不会坏）。
+
+    两个配套坑：判定与正文扫描必须共用 `texutil.math_spans`——自己数 `$$` 会把相邻行内公式 `$a$$b$` 当成显示公式定界符，配对一错位就撑出几千字的「保护区间」，把后面整段正文误判成公式而漏改；嵌套同族命令 `\textbf{A\textbf{B}}` 由预处理压平成 `\textbf{AB}`（pandoc 会输出 `**A**B****`，那个 `****` 无法解析）。
+
+24. **注释剥离不认 verbatim 参数（2026-10-22 修）**：`%(?<!\\)[^\n]*` 一刀切会把 `\url{https://…%3A//…}`、`\lstinline|i16 % 8|` 从 `%` 处截断，留下半个花括号，pandoc 直接报 `unexpected end of input` 或把后续正文吞进巨型 URL。现在 `texutil.strip_comments` 逐字扫描，跳过 `\url`/`\path`/`\nolinkurl`/`\href` 第一参数、`\lstinline`/`\verb` 的任意分隔符内容。主书 0 处这类写法，所以以前没暴露；cute-zhihu 的 reed-08/09、reed-isa-02、frankshi-01、reed-blackwell-dual-die 五章必踩。
+25. **`\urldef` 不展开 → 页首裸链接 + 空脚注**：`\urldef\name\url{…%23…}` + 正文 `\footnote{\name}` 让 pandoc 输出页面顶部一条独立链接、脚注体为空。转换器现在先把定义展开成 `\url{…}` 再删定义（TeX 的展开语义），reed-08/09 的 9 条定义、16 处引用恢复成正常脚注。
+26. **admonition 标题里自带 `\textbf` → 页面上 `****`**：标题先渲染成 `**…**`，`_render_admonition` 又整体包一层 `**`，成了嵌套强调，CommonMark 配不上对，字面 `****` 漏到正文（ch10/ch14/ch16/ch17/ch18/ch19 六处「实践经验」标题）。修法：标题整体已是粗体，包之前把内层 `**` 去掉。`convert.verify` 抓不到（它只看 `check_emphasis_flanking` 的配对判定），只有 `visual_check` 的「未渲染的强调标记」会红。
+27. **多书（主书 + 子集合）装配的五个坑**：
+    - `macros.write()` 每次运行都重写 `build/mathjax-macros.json`，而 `extract()` 只认书根的 `preamble.tex`/`book.tex`；对子集合调用会写成空表、主书公式静默变形。**只对主书写**。
+    - 页面键必须用 docname（`cute-zhihu/reed-01-layout`），用 `path.stem` 会让主书与集合的 `index`、`part-1..4` 互相覆盖，通用核对静默漏页。
+    - raw HTML 表格里的 `<img src="_images/…">` 由转换器硬编码，子目录页面要写 `../_images/…`；`check_images_present` 的正则也必须能匹配 `../` 前缀，否则 173 张图零覆盖还报「共 0 张图」。
+    - `check_translation_dicts` 只能统计站点根页面：集合页面（201 段代码 + 68 个脚注 + 图注的中文）不在词典里，递归就会全算未命中、必红。
+    - 集合的「书目录编号核对」读的是 `<slug>.toc`（cute-zhihu 是 `cute-zhihu.toc`），写死 `book.toc` 会静默跳过。
+    另：`conda run -n cdit python -m tools.visual_check` 会命中 site-packages 里同名的 `tools` 包（`No module named tools.visual_check`），直接跑 `python tools/visual_check.py`。
+
+28. **别用 CSS 强制展开侧栏**：集合的三层目录一开始用 `.toctree-l1.current .toctree-l2 > ul { display: block }` 强开，结果系列前的「+」变成点了没反应的死控件（主题的 `theme.js` 靠切 `li.current` 控制显隐，被 CSS 覆盖后就不生效了）。正解是只调 `navigation_depth: 3` + `titles_only: True`，折叠/展开交给主题：默认「+」收起、点开展开、当前系列自动展开——与主书「篇 → 章」完全一致。
+
+29. **tex 里写字面冒号围栏，pandoc 一定吃掉**：`\lstinputlisting` 找不到文件时，旧实现直接在预处理阶段（**pandoc 之前**）插 ````{admonition} 代码清单未内联```` + `:class: rtd-admon rtd-source-missing`。pandoc 把它当围栏代码块，`:class:` 与首尾弯引号原样漏成正文——线上 ch39 看到的就是这串乱码。更糟的是 `verify` 里按「原书此处引用 `…`」文案匹配的核对项因此恒真（弯引号 + 反引号失配），承诺的「缺快照必红」从未生效。结论：**任何 markdown 结构都必须在 postprocess 阶段用 token 生成**（现在走 `KIND_SOURCE_MISSING` + manifest 的 `missing` 记录，由 `_render_source_missing` 渲染）；核对项一律匹配渲染后的 CSS 类（`rtd-source-missing`），不要匹配正文文案。
+
+## 验收方法（方法论）
+
+- **三层验收，缺一层就会漏**（见 `acceptance.md`）。
+- **总数阈值会掩盖单点丢失**：表格数 126 → 125 时「≥90%」照样通过，ch37 的量化开销表就是这么漏掉的；改成逐章比对后立刻暴露。同理，只看 `sphinx-build` 的告警数会漏掉大量内容错误。
+
+## gitignore 陷阱
+
+仓库根与 `docs/` 两级 `.gitignore` 都有 `*.txt`、`*.tex`、`build*` 规则，会静默吞掉 `docs/readthedocs/requirements.txt` 与 `build.sh`。`docs/readthedocs/.gitignore` 里用 `!requirements.txt`、`!build.sh` 逐条解禁，改动后建议 `git check-ignore -v` 复核。

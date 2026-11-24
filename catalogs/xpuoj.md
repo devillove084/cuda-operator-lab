@@ -1,0 +1,156 @@
+# XPUOJ 练习清单
+
+官网未登录题库快照共有 141 道题。原题链接和公开接口说明在各题文件内。
+另保存了 XPUOJ 的 36 个官方 GitHub 题包。含题包的条目会标注公开测试配置。
+
+[XPUOJ 官网站点](https://xpuoj.com/p) · [官方题包](https://github.com/XPUOJ/XPUOJ-ProblemSet) · [学习路线](../README.md)
+
+## 官网公开题
+
+- [ ] #1 [a += b problem (fp16)](../references/XPUOJ-public/1.md) · 公开测试配置
+- [ ] #2 [Dense GeMM (bf16)](../references/XPUOJ-public/2.md) · 公开测试配置
+- [ ] #3 [Top p Renorm Probs](../references/XPUOJ-public/3.md) · 公开测试配置
+- [ ] #4 [Top k Renorm Probs](../references/XPUOJ-public/4.md) · 公开测试配置
+- [ ] #5 [SwiGLU](../references/XPUOJ-public/5.md) · 公开测试配置
+- [ ] #6 [GeGLU (Tanh Approx)](../references/XPUOJ-public/6.md) · 公开测试配置
+- [ ] #7 [ReLU](../references/XPUOJ-public/7.md) · 公开测试配置
+- [ ] #8 [SiLU](../references/XPUOJ-public/8.md) · 公开测试配置
+- [ ] #9 [CrossEntropy](../references/XPUOJ-public/9.md) · 公开测试配置
+- [ ] #10 [FP8 GeMM NT](../references/XPUOJ-public/10.md) · 公开测试配置
+- [ ] #11 [M Grouped Bf16 Gemm Nt Contiguous](../references/XPUOJ-public/11.md) · 公开测试配置
+- [ ] #12 [M Grouped Bf16 Gemm Nt Masked](../references/XPUOJ-public/12.md) · 公开测试配置
+- [ ] #13 [M Grouped Fp8 Gemm Nt Contiguous](../references/XPUOJ-public/13.md) · 公开测试配置
+- [ ] #14 [M Grouped Fp8 Gemm Nt Masked](../references/XPUOJ-public/14.md) · 公开测试配置
+- [ ] #15 [Linear Variadic Weights](../references/XPUOJ-public/15.md) · 公开测试配置
+- [ ] #16 [Grouped Linear Variadic Weights](../references/XPUOJ-public/16.md) · 公开测试配置
+- [ ] #17 [Per Tensor Quant fp8](../references/XPUOJ-public/17.md) · 公开测试配置
+- [ ] #18 [Fused SiLU and Mul](../references/XPUOJ-public/18.md) · 公开测试配置
+- [ ] #19 [Causal Conv1d Fwd](../references/XPUOJ-public/19.md) · 公开测试配置
+- [ ] #20 [Packbits](../references/XPUOJ-public/20.md) · 公开测试配置
+- [ ] #21 [FP8 Mqa Logits](../references/XPUOJ-public/21.md) · 公开测试配置
+- [ ] #22 [Per Token Quant fp8](../references/XPUOJ-public/22.md) · 公开测试配置
+- [ ] #23 [Index First Axis](../references/XPUOJ-public/23.md) · 公开测试配置
+- [ ] #24 [GeLU TanH and Mul](../references/XPUOJ-public/24.md) · 公开测试配置
+- [ ] #25 [Index Put First Axis](../references/XPUOJ-public/25.md) · 公开测试配置
+- [ ] #26 [Hopper INT4 FP8 Grouped GeMM](../references/XPUOJ-public/26.md) · 公开测试配置
+- [ ] #27 [Sparse GeMM S8 S32 SM90](../references/XPUOJ-public/27.md) · 公开测试配置
+- [ ] #28 [Hopper GeTT](../references/XPUOJ-public/28.md) · 公开测试配置
+- [ ] #29 [Trmm F64 SM90](../references/XPUOJ-public/29.md) · 公开测试配置
+- [ ] #30 [Conv3d Fprop TF32 SM90](../references/XPUOJ-public/30.md) · 公开测试配置
+- [ ] #31 [Hopper FP8 Groupwise GeMM](../references/XPUOJ-public/31.md) · 公开测试配置
+- [ ] #32 [Conv2d Fprop S32](../references/XPUOJ-public/32.md) · 公开测试配置
+- [ ] #33 [Conv2 Fprop Broadcast](../references/XPUOJ-public/33.md) · 公开测试配置
+- [ ] #34 [Gelu and Mul](../references/XPUOJ-public/34.md)
+- [ ] #35 [Single Prefill with KV Cache](../references/XPUOJ-public/35.md)
+- [ ] #36 [Single Prefill with KV Cache Return LSE](../references/XPUOJ-public/36.md)
+- [ ] #37 [cuDNN Batch Decode with KV Cache](../references/XPUOJ-public/37.md)
+- [ ] #38 [TRTLLM Batch Context with KV Cache](../references/XPUOJ-public/38.md)
+- [ ] #39 [TRTLLM Batch Decode with KV Cache](../references/XPUOJ-public/39.md)
+- [ ] #40 [XQA](../references/XPUOJ-public/40.md)
+- [ ] #41 [Flash Apply Rotary EMB](../references/XPUOJ-public/41.md)
+- [ ] #42 [Flash Rotary Embedding Module](../references/XPUOJ-public/42.md)
+- [ ] #43 [Bias GELU](../references/XPUOJ-public/43.md)
+- [ ] #44 [FMHA](../references/XPUOJ-public/44.md)
+- [ ] #45 [Deconv2d F32](../references/XPUOJ-public/45.md)
+- [ ] #46 [Deconv2d Broadcast](../references/XPUOJ-public/46.md)
+- [ ] #47 [Conv3d Fprop F32](../references/XPUOJ-public/47.md)
+- [ ] #48 [Conv3d Fprop Broadcast](../references/XPUOJ-public/48.md)
+- [ ] #49 [Deconv3d F32](../references/XPUOJ-public/49.md)
+- [ ] #50 [Depthwise Conv2d F16](../references/XPUOJ-public/50.md)
+- [ ] #54 [Conv2d Fprop S4](../references/XPUOJ-public/54.md)
+- [ ] #55 [Conv2d Dgrad F16](../references/XPUOJ-public/55.md)
+- [ ] #56 [Conv2d Dgrad F32](../references/XPUOJ-public/56.md)
+- [ ] #57 [Conv2d Strided Dgrad](../references/XPUOJ-public/57.md)
+- [ ] #58 [Flash MLA with KV Cache](../references/XPUOJ-public/58.md)
+- [ ] #59 [Symm F32](../references/XPUOJ-public/59.md)
+- [ ] #60 [Trmm CF64](../references/XPUOJ-public/60.md)
+- [ ] #61 [GeMM Bias Softplus](../references/XPUOJ-public/61.md)
+- [ ] #62 [GeMM Bias Softsign](../references/XPUOJ-public/62.md)
+- [ ] #63 [GeMM Bias Celu](../references/XPUOJ-public/63.md)
+- [ ] #64 [GeMM Bias Selu](../references/XPUOJ-public/64.md)
+- [ ] #65 [Conv2d Bias Softplus](../references/XPUOJ-public/65.md)
+- [ ] #66 [Conv2d Bias Selu](../references/XPUOJ-public/66.md)
+- [ ] #67 [Conv3d Bias Relu](../references/XPUOJ-public/67.md)
+- [ ] #68 [Syrk TF32 F32](../references/XPUOJ-public/68.md)
+- [ ] #69 [CF64 Gaussian GeMM](../references/XPUOJ-public/69.md)
+- [ ] #70 [Simt Complex Double GeMM](../references/XPUOJ-public/70.md)
+- [ ] #71 [Simt SGeMM](../references/XPUOJ-public/71.md)
+- [ ] #72 [Simt Complex Float GeMM](../references/XPUOJ-public/72.md)
+- [ ] #73 [FP4 GeMV](../references/XPUOJ-public/73.md)
+- [ ] #74 [Syr2k TF32 F32](../references/XPUOJ-public/74.md)
+- [ ] #75 [Log Sum Exp](../references/XPUOJ-public/75.md)
+- [ ] #76 [Smooth L1 Loss](../references/XPUOJ-public/76.md)
+- [ ] #77 [Binary Cross Entropy](../references/XPUOJ-public/77.md)
+- [ ] #78 [Label Smoothing Loss](../references/XPUOJ-public/78.md)
+- [ ] #79 [Gemm Act](../references/XPUOJ-public/79.md)
+- [ ] #80 [Gemm Dact](../references/XPUOJ-public/80.md)
+- [ ] #81 [Linear Cross Entropy](../references/XPUOJ-public/81.md)
+- [ ] #82 [Softmax Cross Entropy Loss](../references/XPUOJ-public/82.md)
+- [ ] #83 [Topk Sigmoid](../references/XPUOJ-public/83.md)
+- [ ] #84 [Layer Norm](../references/XPUOJ-public/84.md)
+- [ ] #85 [Layernorm Forward](../references/XPUOJ-public/85.md)
+- [ ] #86 [Fused Add RMSNorm Quant](../references/XPUOJ-public/86.md)
+- [ ] #87 [Fused RMS Norm](../references/XPUOJ-public/87.md)
+- [ ] #88 [FMHA Forward Ampere](../references/XPUOJ-public/88.md)
+- [ ] #89 [Flash Fused Dense](../references/XPUOJ-public/89.md)
+- [ ] #90 [Sqa Ngram Merge](../references/XPUOJ-public/90.md)
+- [ ] #91 [Dropout](../references/XPUOJ-public/91.md)
+- [ ] #92 [Residual Conn](../references/XPUOJ-public/92.md)
+- [ ] #93 [Index Copy](../references/XPUOJ-public/93.md)
+- [ ] #94 [Im2col Rmpad](../references/XPUOJ-public/94.md)
+- [ ] #95 [Index Mul 2d](../references/XPUOJ-public/95.md)
+- [ ] #96 [FFT](../references/XPUOJ-public/96.md)
+- [ ] #97 [Marlin W4a16 GeMM](../references/XPUOJ-public/97.md)
+- [ ] #98 [Grouped GeMM](../references/XPUOJ-public/98.md)
+- [ ] #99 [Mixed w4a4 w8a8 GeMM](../references/XPUOJ-public/99.md)
+- [ ] #100 [Transpose](../references/XPUOJ-public/100.md)
+- [ ] #101 [Int8 Scale Amax](../references/XPUOJ-public/101.md)
+- [ ] #102 [Cumsum](../references/XPUOJ-public/102.md)
+- [ ] #103 [l2 Normalize](../references/XPUOJ-public/103.md)
+- [ ] #104 [Apply Token Bitmask Inplace CUDA](../references/XPUOJ-public/104.md)
+- [ ] #105 [Awq Marlin Repack](../references/XPUOJ-public/105.md)
+- [ ] #106 [Triplet Loss](../references/XPUOJ-public/106.md)
+- [ ] #107 [Cosine Embedding Loss](../references/XPUOJ-public/107.md)
+- [ ] #108 [Dice Loss](../references/XPUOJ-public/108.md)
+- [ ] #109 [Iou Loss](../references/XPUOJ-public/109.md)
+- [ ] #110 [Flash Fused MLP](../references/XPUOJ-public/110.md)
+- [ ] #111 [Quack RMSNorm](../references/XPUOJ-public/111.md)
+- [ ] #112 [Apply RoPE Pos Ids](../references/XPUOJ-public/112.md)
+- [ ] #113 [RoPE Quantize FP8](../references/XPUOJ-public/113.md)
+- [ ] #114 [MLA RoPE Quantize FP8](../references/XPUOJ-public/114.md)
+- [ ] #115 [Fused Apply RoPE](../references/XPUOJ-public/115.md)
+- [ ] #116 [Fused Apply RoPE Cached](../references/XPUOJ-public/116.md)
+- [ ] #117 [FSMN Fused GLU FSMN LayerNorm GELU](../references/XPUOJ-public/117.md)
+- [ ] #118 [Relative Position Embedding Query Add Bias and Transpose](../references/XPUOJ-public/118.md)
+- [ ] #119 [Cutlass W4A8 MoE MM](../references/XPUOJ-public/119.md)
+- [ ] #120 [MoE Scatter Up GEMM](../references/XPUOJ-public/120.md)
+- [ ] #121 [FMHA Varlen Forward Ampere](../references/XPUOJ-public/121.md)
+- [ ] #122 [FMHA Varlen Backword Ampere](../references/XPUOJ-public/122.md)
+- [ ] #123 [Log Linear Attention](../references/XPUOJ-public/123.md)
+- [ ] #124 [Top K Sampling from Logits](../references/XPUOJ-public/124.md)
+- [ ] #125 [Top P Sampling from Logits](../references/XPUOJ-public/125.md)
+- [ ] #126 [FMHA with KV Cache Ampere](../references/XPUOJ-public/126.md)
+- [ ] #127 [Min-p Sampling from Logits](../references/XPUOJ-public/127.md)
+- [ ] #128 [FMHA QKV Packed Ampere](../references/XPUOJ-public/128.md)
+- [ ] #129 [FMHA KV Packed Ampere](../references/XPUOJ-public/129.md)
+- [ ] #130 [Flash Cross Entropy Loss](../references/XPUOJ-public/130.md)
+- [ ] #131 [Unpad Sequence](../references/XPUOJ-public/131.md)
+- [ ] #132 [Dynamic Quantize GeMM](../references/XPUOJ-public/132.md)
+- [ ] #133 [Rmsnorm GeMM](../references/XPUOJ-public/133.md)
+- [ ] #134 [GeMM Bias Add](../references/XPUOJ-public/134.md)
+- [ ] #135 [Layernorm GeMM](../references/XPUOJ-public/135.md)
+- [ ] #136 [GeMM Bias Add Relu](../references/XPUOJ-public/136.md)
+- [ ] #137 [GEMM Bias Add GELU](../references/XPUOJ-public/137.md)
+- [ ] #138 [Einsum Bmm](../references/XPUOJ-public/138.md)
+- [ ] #139 [Einsum Outer](../references/XPUOJ-public/139.md)
+- [ ] #140 [Einsum Contraction](../references/XPUOJ-public/140.md)
+- [ ] #141 [Einsum Trace](../references/XPUOJ-public/141.md)
+- [ ] #142 [GEMM Bias PReLU](../references/XPUOJ-public/142.md)
+- [ ] #143 [GEMM Softmax Cross Entropy](../references/XPUOJ-public/143.md)
+- [ ] #144 [GEMM LogSoftmax](../references/XPUOJ-public/144.md)
+
+## GitHub 题包中的额外条目
+
+- [ ] #10001 [Fused MoE GEMM](../references/XPUOJ/problem_10001/zh_CN/00_题目描述.md) · 公开测试配置
+- [ ] #10002 [DeepSeek MLA Decode](../references/XPUOJ/problem_10002/zh_CN/00_题目描述.md) · 公开测试配置
+- [ ] #10003 [Native Sparse Attention](../references/XPUOJ/problem_10003/zh_CN/00_题目描述.md) · 公开测试配置

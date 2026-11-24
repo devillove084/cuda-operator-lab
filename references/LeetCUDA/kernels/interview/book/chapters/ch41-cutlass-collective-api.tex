@@ -1,0 +1,1086 @@
+% ch41-cutlass-collective-api.tex — CUTLASS Collective API：从常规 GEMM 到 FP8/FP4（RFC-Q/R）
+% BF16：kernels/interview/collective_gemm.cuh（SM90 最小实现，新增后纳入 anchors）
+% FP8：cache-dit(453c1b05) csrc/kernels/fp8/；FP4：cache-dit(eced0158) csrc/kernels/fp4/
+% CUTLASS v4.8.1
+\chapter{CUTLASS Collective API：从常规 GEMM 到 FP8/FP4}\label{ch:41}
+
+\section{本章导读}
+
+前面的 GEMM 章节把一条高性能路径拆到了很细：TMA descriptor、shared-memory
+layout、stage ring、mbarrier、MMA atom、寄存器 fragment 和输出写回都要由调用者
+逐项对齐。第~\ref{ch:24}~章说明 CuTe 如何复用这些构件，第~\ref{ch:35}~章与
+第~\ref{ch:37}~章又分别给出了 FP8、NVFP4 的手写实现。本章换一个层次，直接
+使用 CUTLASS 3.x 的 \textbf{Collective API}：调用者描述矩阵类型、布局、tile、
+stage 策略和 epilogue 数学，库负责选出相匹配的 mainloop 与 epilogue。
+
+这条路径不是把性能调优变成一句模板实例化。它把可复用的主流水收敛到库内，
+同时把算子约定留给调用者。常规 GEMM 只需较少声明就能得到一条合理的 Tensor
+Core 路径；量化 GEMM 还要说明 scale 的粒度、存放布局和施加位置。layout 或
+scale 约定写错时，Builder 不会替调用者修正数学。
+
+本章按五种复杂度递进：
+\begin{enumerate}[itemsep=1pt,topsep=2pt]
+  \item \textbf{BF16 常规 GEMM}：新增 \texttt{collective\_}\allowbreak\texttt{gemm.cuh}，用两个
+        Builder 完成 $D=\alpha AB^{\top}+\beta C$。这是最小的 Collective API
+        使用案例，目标架构为 SM90。
+  \item \textbf{FP8 per-row/per-tensor}：普通 FP8 mainloop 先得到未缩放的
+        FP32 accumulator，再在 EVT 中施加 activation/weight scale 和 bias。
+  \item \textbf{FP8 per-block}：blockwise mainloop 在每个 K128 块内施加
+        $1\times128$ activation scale 与 $128\times128$ weight scale，epilogue
+        只加 bias。
+  \item \textbf{NVFP4 两级量化}：block-scaled mainloop 消费 e2m1 数据与
+        ue4m3 micro-scale，EVT 再折回两侧的 FP32 global scale 和 bias。
+  \item \textbf{融合 MLP}：把 GELU 放进第一层 GEMM 的 EVT，把 SwiGLU 的
+        gating、amax 与量化合并进下一层的量化 producer，同时保留第二层
+        无法消除的动态量化边界。
+\end{enumerate}
+
+\textbf{源码与版本}：BF16 示例位于本仓
+\texttt{kernels/interview/collective\_gemm.cuh}。FP8 示例引用 cache-dit
+commit \texttt{453c1b05}（PR \#1371 合并提交）的
+\texttt{csrc/kernels/fp8/} 下三个文件：\texttt{gemm/gemm.cuh}、
+\texttt{quantize.cu} 与 \texttt{gemm/per\_*.cu}。FP4 示例锚定
+\texttt{eced0158}，该 PR 未改动 \texttt{csrc/kernels/fp4/} 下任何文件，
+两个 commit 指向同一份 FP4 内容。cache-dit 使用 CUTLASS v4.8.1，
+完整代码入口见附录~\ref{app:D}。
+
+\textbf{架构边界}：BF16 示例采用 \texttt{arch::Sm90}。CUTLASS 4.8.1 的 SM120
+dense CollectiveBuilder 只支持 F8F6F4 TensorOp，因此不能把同一组 BF16 模板参数
+机械地改为 \texttt{arch::Sm120}。本章 SM120 内容限定为 cache-dit 的 FP8/FP4
+路径。测试与性能复测使用 RTX PRO 5000（SM120）、CUDA Event；融合 MLP 一节的
+数字取自 cache-dit PR \#1371，本书未复测，见 \S6.1。BF16 示例另做 SM90A 编译
+验证，本机不执行 SM90 kernel。
+
+\section{问题与动机：手写主循环与库主循环的分工}
+
+一个 GEMM  kernel 可以粗略分成两层。第一层是数学约定：输入是什么 dtype，
+$B$ 的物理布局是什么，是否量化，scale 属于哪个块，输出是否带 bias。第二层是
+执行机制：怎样把 tile 从 global memory 搬到 shared memory，怎样让搬运与 MMA
+重叠，怎样分配寄存器 fragment，怎样把 accumulator 写回。手写教学 kernel 需要
+同时维护两层，因此一处 layout 改动往往会沿整条流水传播。
+
+Collective API 把第二层的主要决策交给 Builder。调用者仍需理解第一层，也需要
+给第二层足够的约束，例如 \texttt{TileShape} 和 alignment；但不必再为每一种
+常规 GEMM 重写一套 TMA/mbarrier 代码。图~\ref{fig:41-api-stack} 展示了实际
+调用链。两个 Builder 分别产生 mainloop 与 epilogue 类型，
+\texttt{GemmUniversal} 把二者组合成 kernel，
+\texttt{GemmUniversalAdapter} 再提供 host 侧的 \texttt{Arguments}、
+\texttt{initialize}、workspace 和 \texttt{run} 接口。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt,
+              minimum width=3.0cm, minimum height=1.25cm},
+  arr/.style={-{Stealth[length=2mm]}, thick, draw=tkBlue}]
+\node[box, draw=tkBlue] (builders) at (0,0)
+  {两个 CollectiveBuilder\\mainloop + epilogue};
+\node[box, draw=tkGreen] (kernel) at (3.55,0)
+  {GemmUniversal\\组合 kernel 类型};
+\node[box, draw=tkPurple] (adapter) at (7.10,0)
+  {GemmUniversalAdapter\\host 调用接口};
+\node[box, draw=tkOrange] (run) at (10.65,0)
+  {Arguments + workspace\\initialize / run};
+\draw[arr] (builders) -- (kernel);
+\draw[arr] (kernel) -- (adapter);
+\draw[arr] (adapter) -- (run);
+\node[align=center, text=tkBlue!75!black] at (5.3,-1.55)
+  {调用者保留：dtype / layout / tile / scale / bias / stream};
+\end{tikzpicture}
+\caption{Collective API 的四个层次。Builder 生成执行构件，Adapter 负责 host
+调用；矩阵与量化约定并没有从调用代码中消失。}
+\label{fig:41-api-stack}
+\end{figure}
+
+这种分工有三个直接收益。其一，常规 GEMM 的默认路径已经足够完整，适合先做
+正确且具备良好执行机制的基线。其二，tile、stage 与 epilogue schedule 成为
+集中参数，后续调优不必改动一整套手写协议。其三，量化路径可以只替换需要的
+部分：FP8 row/tensor 共用 mainloop，只改 EVT 的广播 stride；FP4 的 1x/2x
+也共用 mainloop，只改 global-scale epilogue。本章最后一步沿同一条缝再走一次：
+融合 MLP 给 EVT 加一个 activation 根节点，或给下一层的量化 producer 加一段
+门控，mainloop 仍不动。
+
+收益不等于无条件最优。库默认配置仍受架构、shared-memory 容量、tile 波次、
+量化 rescale 成本和 host 封装开销影响。尤其在本章的 SM120 案例中，低精度
+Builder 使用 warp 级 \texttt{mma.sync}，不是 SM100 的 tcgen05/TMEM 路径；
+blockwise FP8 还需要每个 K128 块结束后 rescale。更准确的结论是：
+\textbf{Collective API 提供的是一条高质量、可继续测量的实现起点，而不是
+免测量的性能证明。}
+
+\section{数学原理：把 GEMM 与 scale 放在正确的位置}
+
+\subsection{常规 GEMM 与 K-tile 分解}
+
+设 $A\in\mathbb R^{M\times K}$，物理 weight 为 $B\in\mathbb R^{N\times K}$，
+$C,D\in\mathbb R^{M\times N}$。本章计算
+\begin{equation}
+  D=\alpha AB^{\top}+\beta C
+   =\alpha\sum_{g=0}^{G-1}A_{:,\,gK_t:(g+1)K_t}
+       B_{:,\,gK_t:(g+1)K_t}^{\top}+\beta C,
+  \label{eq:41-gemm}
+\end{equation}
+其中 $K_t$ 是 mainloop 的 K-tile 宽度，$G=\lceil K/K_t\rceil$。Builder 管理
+的是这个求和过程的执行方式。调用者提供的是矩阵元素的寻址方式与最终
+$\alpha,\beta$ 的语义，不需要显式写出式~\ref{eq:41-gemm} 的循环。
+
+$B$ 的布局最容易误读。\texttt{torch.nn.Linear.weight} 和普通 row-major
+weight 都是 $[N,K]$。同一段内存若按 $[K,N]$ 的 column-major 解释，其
+$(k,n)$ 元素仍位于 $nK+k$，恰好就是数学上的 $B^{\top}$。因此示例把
+\texttt{LayoutB} 写成 \texttt{ColumnMajor}，但并没有做任何转置拷贝。
+
+\subsection{FP8：单级 FP32 scale 的两种施加位置}
+
+对一个量化单元 $U$，本章 FP8 约定为
+\begin{equation}
+  s_U=\frac{\max_{i\in U}|x_i|}{448},\qquad
+  q_i=\operatorname{satfinite\_e4m3}(x_i/s_U),\qquad
+  \hat x_i=s_Uq_i.
+  \label{eq:41-fp8-quant}
+\end{equation}
+scale 是反量化乘子，不是量化时使用的倒数。per-row 对 activation 的每一行
+和 weight 的每一个输出通道各给一个 FP32 scale；per-tensor 则整个矩阵共用一个
+标量。未缩放 mainloop 先得到
+$P_{m,n}=\sum_k q_A[m,k]q_B[n,k]$，EVT 再计算
+\begin{equation}
+  D_{m,n}=\operatorname{BF16}\!\left(
+    s_B[n]\,(s_A[m]P_{m,n})+\mathrm{bias}[n]\right).
+  \label{eq:41-fp8-evt}
+\end{equation}
+per-tensor 不需要把标量扩展成长度为 $M,N$ 的数组，只要把对应广播 stride
+置零即可。
+
+per-block 的 scale 依赖 K 块，不能等到完整 $P$ 算完后只乘一次。令第 $g$
+个 K128 块的部分积为 $P^{(g)}$，则
+\begin{equation}
+  D_{m,n}=\operatorname{BF16}\!\left(
+    \sum_g s_A[m,g]\,s_B[\lfloor n/128\rfloor,g]\,P^{(g)}_{m,n}
+    +\mathrm{bias}[n]\right).
+  \label{eq:41-fp8-block}
+\end{equation}
+这里 $s_A$ 是 $[M,K/128]$ 的 $1\times128$ scale 表，$s_B$ 是
+$[N/128,K/128]$ 的 $128\times128$ scale 表。缩放发生在 mainloop 的块边界；
+若 epilogue 再乘一次 $s_As_B$，就重复施加了 scale。
+
+\subsection{NVFP4：micro-scale 与 global-scale 是两级对象}
+
+NVFP4 不是把 FP8 的 e4m3 换成 e2m1。生产路径先按行求 FP32 global scale，
+再对归一化后的每 16 个元素求 ue4m3 micro-scale。对一行 $r$，可写为
+\begin{align}
+  g_r &= \frac{\max_k|x_{r,k}|}{448\times6},\qquad x'_{r,k}=x_{r,k}/g_r,\\
+  s_{r,u} &= \operatorname{UE4M3}\!\left(
+    \frac{\max_{k\in u}|x'_{r,k}|}{6}\right),\qquad
+  q_{r,k}=\operatorname{E2M1}\!\left(
+    \frac{x'_{r,k}}{\operatorname{FP32}(s_{r,u})}\right).
+  \label{eq:41-fp4-quant}
+\end{align}
+block-scaled MMA 消费 $q$ 与 $s$，得到已含 micro-scale 的 accumulator $P$；
+EVT 再完成
+\begin{equation}
+  D_{m,n}=\operatorname{BF16}\!\left(
+    g_B[n]\,(g_A[m]P_{m,n})+\mathrm{bias}[n]\right).
+  \label{eq:41-fp4-evt}
+\end{equation}
+式~\ref{eq:41-fp8-evt} 与式~\ref{eq:41-fp4-evt} 形式相同，但 $P$ 的含义
+不同：FP8 row/tensor 的 $P$ 是未缩放 FP8 点积，NVFP4 的 $P$ 已经过硬件
+block-scaled MMA 的 micro-scale 处理。把两者混为一谈，就会漏乘或重乘一级
+scale。
+
+\subsection{融合 MLP：哪些算子能并入前一层 GEMM}
+
+一个两层 MLP 写成
+\begin{equation}
+  H=\operatorname{act}\!\left(XW_1^{\top}+b_1\right)\in\mathbb R^{M\times N},
+  \qquad
+  Y=HW_2^{\top}+b_2,
+  \label{eq:41-mlp}
+\end{equation}
+其中 $X\in\mathbb R^{M\times K}$，$W_1\in\mathbb R^{N\times K}$。DiT 里
+$N$ 通常在 $4K$ 附近。朴素实现把这段计算拆成「GEMM—逐元素—GEMM」，中间的
+$H$ 至少要写出一次、再读回一次。
+
+融合的第一个问题是边界：哪些算子能贴近前一个 GEMM。判据是数据依赖的范围。
+若某个算子的每个输出只依赖同一坐标的输入，它就是逐元素的，可以放进
+epilogue；若它需要一整行或一整列，就不能。
+
+第二层的动态量化恰恰需要一整行：
+\begin{equation}
+  s_m=\frac{\max_{j<N}|H_{m,j}|}{448},\qquad
+  q_{m,j}=\operatorname{satfinite\_e4m3}\!\left(H_{m,j}/s_m\right).
+  \label{eq:41-mlp-quant}
+\end{equation}
+$s_m$ 依赖第 $m$ 行的全部 $N$ 个元素。实现上另有一条零行约定：$s_m=0$ 时
+除数取 $1$，并存下 $s_m=0$；这样全零行的输出是 $q=0$ 而不是 $0/0$。
+epilogue 的 tile 只有 $64\times64$，
+一个 CTA 只拥有 $128\times128$ 的输出块，写回时没有任何一个线程能看到完整
+一行。要在这里得到 $s_m$，必须跨 tile、跨 CTA 归约，再把输出重写一遍。所以
+\textbf{第二层的动态量化不能并入第一层的 epilogue}；融合 MLP 能把边界推到
+「第一层 GEMM + activation」，再往后仍是一次普通的量化与 GEMM。
+
+GELU 侧的融合结果因此是
+\begin{equation}
+  H_{m,n}=\operatorname{BF16}\!\left(\operatorname{act}\!\left(
+    s^{(1)}_B[n]\left(s^{(1)}_A[m]P^{(1)}_{m,n}\right)+b_1[n]\right)\right),
+  \label{eq:41-gelu-epilogue}
+\end{equation}
+其中 $P^{(1)}$ 是第一层的未缩放 accumulator。式~\ref{eq:41-gelu-epilogue}
+与式~\ref{eq:41-fp8-evt} 只差最外层一次 activation：scale 与 bias 仍是 EVT
+的内层节点，activation 是新的根节点。PyTorch 的
+\texttt{approximate="tanh"} 形式为
+\begin{equation}
+  \operatorname{GELU}_{\tanh}(x)=\tfrac12 x\left(1+\tanh\!\left(
+    \sqrt{\tfrac{2}{\pi}}\left(x+0.044715x^{3}\right)\right)\right),
+  \label{eq:41-gelu-tanh}
+\end{equation}
+它与 erf 版不是同一个函数，必须按调用者的选择分别实例化。
+
+SwiGLU 的边界不同。它的隐藏状态是两路投影的逐元素门控：
+\begin{equation}
+  H=V\odot\operatorname{silu}(G),\qquad
+  V=XW_v^{\top},\quad G=XW_g^{\top}.
+  \label{eq:41-swiglu}
+\end{equation}
+门控、amax 与量化都只依赖 $(V_{m,j},G_{m,j})$ 这一对数，因此可以整体放进
+\textbf{下一层 GEMM 的量化 producer}：
+\begin{equation}
+  q^{H}_{m,j},\,s_m=Q\!\left(V_{m,j}\cdot\operatorname{silu}(G_{m,j})\right),
+  \label{eq:41-swiglu-producer}
+\end{equation}
+这样就不再需要把 $H$ 落成 BF16 张量。代价是 producer 必须复现未融合链的
+舍入次序：
+\begin{equation}
+  h_{m,j}=\operatorname{BF16}\!\left(V_{m,j}\cdot
+    \operatorname{float}\!\left(\operatorname{BF16}\!\left(
+      \operatorname{silu}(G_{m,j})\right)\right)\right),
+  \label{eq:41-swiglu-round}
+\end{equation}
+即 silu 先舍入到 BF16，再与 BF16 的 value 相乘并再次舍入。少一次、或多一次，
+amax 就可能不同，整行的 scale 随之改变。式~\ref{eq:41-swiglu-round} 是后面
+逐 bit 一致的依据，不是实现细节。不过它固定的只是舍入位置：silu 本身仍用
+\texttt{\_\_expf} 计算、扩展整体以 \texttt{--use\_fast\_math} 构建，逐 bit
+相同仍要靠实测确认（§6.1）。
+
+\section{设计与实现}
+
+\subsection{常规 BF16：两个 Builder 就够启动一条 GEMM 路径}
+
+本仓示例先声明
+$128\times128\times64$ 的 CTA tile、$1\times1\times1$ cluster 和默认
+\texttt{LinearCombination}。epilogue Builder 的参数顺序依次是 EpilogueTile、
+accumulator、compute、C 类型与布局、D 类型与布局、schedule、fusion operation。alignment
+以\textbf{元素数}计：BF16 的 8 个元素和 FP32 的 4 个元素都是 16\,B。
+
+\begin{lstinputlisting}[linerange={31-53},firstnumber=auto,
+  title={collective\_gemm.cuh L31--53（BF16 的两个 Builder）}]{../collective_gemm.cuh}
+\end{lstinputlisting}
+
+这里先构造 \texttt{CollectiveEpilogue}，再构造 mainloop。
+\texttt{StageCountAuto}\allowbreak\texttt{Carveout} 接收的是需要从 shared-memory 预算中扣除的
+epilogue 存储大小，\textbf{不是 stage 数}。Builder 在剩余预算内选择合法
+stage 数。\texttt{KernelSchedule}\allowbreak\texttt{Auto} 与
+\texttt{EpilogueSchedule}\allowbreak\texttt{Auto} 表示让库选择调度标签；它们是明确的配置输入，
+不是跳过 schedule 设计审查的理由。
+
+\texttt{GemmUniversal} 把 mainloop、epilogue 和 tile scheduler 组合为
+kernel 类型，最后的 \texttt{void} 使用默认 scheduler 选择。
+\texttt{GemmUniversalAdapter} 是 host 侧入口，负责参数、初始化和 launch。
+调用者没有写 TMA descriptor、MMA atom、pipeline 或 mbarrier。
+
+host 包装只需生成 packed stride、填充参数并处理 workspace。示例的 C 与 D
+是不同缓冲区，$\beta=0$ 表示数学上不依赖 C 的值，是否发起读取由
+epilogue 实现决定；cache-dit 的量化案例则让 C、D
+指向同一输出，因为它们的语义是 $D=AB^{\top}+\mathrm{bias}$，不是
+$D\leftarrow C+D$。
+
+\begin{lstinputlisting}[linerange={65-89},firstnumber=auto,
+  title={collective\_gemm.cuh L65--89（packed stride 与 Adapter launch）}]{../collective_gemm.cuh}
+\end{lstinputlisting}
+
+最小测试把输入先舍入到 BF16，再用这些已舍入值计算 FP64 参考，最后检查
+FP32 输出。该测试的设计目标是核对 collective 的计算与 launch，不把“原始
+FP32 输入到 BF16 输入的量化误差”误算成 GEMM 误差；本次只完成编译验证。
+
+\subsection{FP8 row/tensor：把 scale 写成一棵 EVT}
+
+EVT 是 \textbf{Epilogue Visitor Tree}。叶节点读取 accumulator 或广播输入，
+内部节点执行乘加等逐元素操作，根节点产生输出 tile。它描述的是输出元素的
+计算图，不是另一份手写 mainloop。cache-dit 的 FP8 row/tensor EVT 如下：
+
+\begin{lstinputlisting}[linerange={145-155},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L145--155（scale + bias 的 EVT）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+按代码中的节点类型，\texttt{Sm90ColBroadcast} 读取随输出行 $m$ 变化的
+$s_A[m]$，\texttt{Sm90RowBroadcast} 读取随输出列 $n$ 变化的 $s_B[n]$ 与
+bias。内层 \texttt{multiplies} 先算 $s_A[m]P_{m,n}$，外层
+\texttt{homogeneous\_multiply\_add} 再算
+$s_B[n]\,(s_A[m]P_{m,n})+\mathrm{bias}[n]$，与式~\ref{eq:41-fp8-evt} 一致。
+所有中间计算使用 FP32，最后才转 BF16。
+
+mainloop 仍是普通 FP8 GEMM。A/B 都是 e4m3，alignment 为 16 个元素，即
+16\,B；accumulator 是 FP32，CTA tile 为 $128\times128\times128$。
+
+\begin{lstinputlisting}[linerange={363-376},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L363--376（FP8 row/tensor Builder）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+per-row 与 per-tensor 共用这份编译结果。per-tensor 仅在 host 侧把 scale
+stride 改为零：同一地址上的标量被所有输出坐标复用，不需要分配两个向量。
+
+\begin{lstinputlisting}[linerange={504-518},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L504--518（零 stride 广播与参数组装）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+这也是 Collective API 很有价值的一点：变化停留在参数层。库不需要为
+“A scalar/B vector”“A vector/B scalar”等组合分别生成四份 kernel。
+
+\subsection{FP8 per-block：scale layout 是 mainloop 的输入类型}
+
+per-block 不能只改 EVT。A/B 的布局模板参数变为数据 layout 与 scale-factor
+layout 的 \texttt{tuple}。这里把
+\texttt{Sm120Blockwise}\allowbreak\texttt{ScaleConfig<1,128,128>} 作为简写；
+完整模板还用两个 \texttt{UMMA::Major::K} 指定双方的 scale 主序。前三个数
+描述 A 的 M 粒度 1、B 的 N 粒度 128、双方共同的 K 粒度 128。
+
+\begin{lstinputlisting}[linerange={438-458},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L438--458（blockwise scale config 与 Builder）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+\texttt{deduce\_layoutSFA()} 出现在 \texttt{decltype} 中。它不会被运行时
+执行，也不计算 scale，只产出一个包含静态粒度与动态占位的 layout
+\textbf{类型}。Builder 从该类型读出 scale granularity，并检查 tile 是否
+相容。对当前配置，K-tile 必须等于 128，而不只是“128 的倍数”。
+
+实际的运行时布局由 \texttt{tile\_atom\_to\_shape\_SFA/SFB} 生成。设
+$G=K/128$，cache-dit 的 SFA 是普通 row-major $[M,G]$，所以
+\begin{equation}
+  \operatorname{offset}_{SFA}(m,g)=mG+g;
+  \label{eq:41-sfa-offset}
+\end{equation}
+SFB 是 row-major $[N/128,G]$，所以
+$\operatorname{offset}_{SFB}(n_b,g)=n_bG+g$。这两个函数把实际的 $M,N,K$
+填进动态 extent 和 stride，得到可寻址的 layout \textbf{值}。
+
+\begin{lstinputlisting}[linerange={547-569},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L547--569（运行时 SFA/SFB layout 与 mainloop 参数）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+scale 表的生产者必须服从同一映射。若量化器按 $[G,M]$ 写出，而 GEMM
+按 $[M,G]$ 读取，模板仍然可以编译，结果却会系统地读错 scale。Collective
+API 能把布局检查提前到类型层，但不能替一段错误内存赋予正确语义。
+
+\subsection{NVFP4：换 mainloop 类型，保留清晰的 EVT 分工}
+
+FP4 路径使用 \texttt{OpClassBlockScaledTensorOp} 和
+\texttt{nv\_float4\_t<float\_e2m1\_t>}。每个打包字节含两个 FP4 值，因此
+alignment 取 32 个 FP4 元素，仍为 16\,B。K-tile 为 256，覆盖 16 个 K16
+micro-scale 组。cache-dit 用 1x 表示只保留 micro-scale 的单级路径，用 2x
+表示 micro-scale 再叠加 global-scale 的两级路径；生产 Linear 使用后者。
+2x 版本的 Builder 如下：
+
+\begin{lstinputlisting}[linerange={214-239},firstnumber=auto,
+  title={cache-dit fp4/gemm.cuh L214--239（NVFP4 两级 collective）}]{../../../../cache-dit/csrc/kernels/fp4/gemm.cuh}
+\end{lstinputlisting}
+
+host 侧从打包字节宽恢复逻辑 $K=2\times\texttt{a.size(1)}$，通过
+\texttt{Sm1xxBlkScaledConfig} 生成 SFA/SFB layout，并把 global-scale 指针
+交给 EVT。micro-scale 指针进入 mainloop，global-scale 指针进入 epilogue，
+两个对象不能交换。
+
+\begin{lstinputlisting}[linerange={287-320},firstnumber=auto,
+  title={cache-dit fp4/gemm.cuh L287--320（打包 K、scale layout 与 EVT 参数）}]{../../../../cache-dit/csrc/kernels/fp4/gemm.cuh}
+\end{lstinputlisting}
+
+NVFP4 的 canonical scale 存储也不是普通 $[M,K/16]$ 数组。一个 512\,B
+原子覆盖 128 行和连续四个 K16 组，原子内按 32 行子块交错。cache-dit 用
+下面的公式定位 scale 字节；padding 行的 scale 必须置零。
+
+\begin{lstinputlisting}[linerange={69-82},firstnumber=auto,
+  title={cache-dit fp4/quantize.cuh L69--82（NVFP4 的 512 B scale 原子）}]{../../../../cache-dit/csrc/kernels/fp4/quantize.cuh}
+\end{lstinputlisting}
+
+这段布局同时解释了为什么不能把量化输出直接当作普通矩阵传给另一个
+block-scaled GEMM：双方不仅需要相同的 FP4 数值格式，还需要相同的 scale
+atom、atom 遍历顺序和 padding 约定。
+
+\subsection{workspace、stream 与 host ABI}
+
+三种实现都遵循同一 launch 顺序：构造 problem shape 与 stride，生成运行时
+scale layout，填充 mainloop/epilogue 参数，查询 workspace，初始化 Adapter，
+最后在调用者的 stream 上 \texttt{run}。workspace 是否存在由
+\texttt{get\_workspace\_size} 决定，不能凭经验假定恒为零。生产 runner 应
+复用非零 workspace；本章 BF16 头文件为保持单函数示例，只在库显式请求时
+临时分配。
+
+cache-dit 还用 \texttt{gemm.h} 的 \texttt{void*} launch ABI 隔离 Torch
+扩展入口与 CUTLASS/CuTe 头文件。实际的模板实例化留在
+\texttt{gemm/per\_row.cu}、\texttt{per\_tensor.cu} 和
+\texttt{per\_block.cu}。这种拆分不改变算法，却减少了 Torch TU 对大型模板
+头文件的依赖，也避免多个 TU 重复实例化同一份 collective。
+
+\subsection{融合 MLP：EVT 加根节点，producer 加门控}
+
+式~\ref{eq:41-mlp} 的两层 MLP 在代码里分五层入口，从配置文件一直到内核，
+见表~\ref{tab:41-fused-entry}。
+日常使用只需要前两层；后三层解释了「融合」在代码里到底是什么。
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lll}
+\toprule
+层 & 入口 & 作用 \\
+\midrule
+配置 / CLI & \texttt{fp8\_fused\_mlp}、\texttt{--fp8-fused-mlp} & 启用结构化 pass \\
+Python 助手 & \texttt{fused\_gelu\_mlp}、\texttt{fused\_gelu\_proj}、\texttt{fused\_swiglu\_mlp} & 单块 / 单投影显式调用 \\
+Linear & \texttt{QW8A8Linear.forward(x, activation=...)} & 单层 GELU epilogue \\
+自定义算子 & \texttt{fp8\_gemm\_activation}、\texttt{fp8\_quantize\_swiglu} & 图内可编译 \\
+C++ / kernel & \texttt{fp8\_gemm\_activation(...)}、\texttt{Fp8*ActivationGemm} & pybind 与模板 \\
+\bottomrule
+\end{tabular}
+\caption{融合 MLP 的五层入口。前三层是调用约定，后两层是本章关心的实现。}
+\label{tab:41-fused-entry}
+\end{table}
+
+\paragraph{GELU：一个 functor 加一个根节点}
+
+CUTLASS 内置的 \texttt{thread::GELU} 是 erf 版。PyTorch 在
+\texttt{approximate}\allowbreak\texttt{="tanh"} 下用的是
+式~\ref{eq:41-gelu-tanh} 的另一个函数，因此 cache-dit 自己写了一个逐元素
+算子，并保持 PyTorch 的运算次序与常数：
+
+\begin{lstinputlisting}[linerange={94-122},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L94--122（PyTorch 口径的 tanh GELU）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+两个重载分别处理标量与 \texttt{Array<T,N>}，后者是 EVT 实际调用的形态；
+\texttt{kIsHeavy} 是 CUTLASS 区分轻量、重量级逐元素算子的钩子。缺这一项不影响
+本路径的正确性，却会让这个算子与库内置 activation 的声明形态不一致。
+
+有了 functor，新的 fusion operation 只是在内层 scale+bias 树上接一个 compute
+节点：
+
+\begin{lstinputlisting}[linerange={192-214},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L192--214（scale+bias 树外再接 activation）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+这里有两处值得逐字看。第一处是树的形状：\texttt{Sm90EVT} 的第二个模板参数
+原样保留，第一个换成 \texttt{Sm90Compute} 节点，实参见上面的 listing。
+EVT 是树，加 capability 就是加节点，不需要重写内层。第二处是类型边界：
+内层节点的输出类型仍是 \texttt{ElementOutput}（BF16），
+\texttt{Sm90Compute} 再把该值转成 \texttt{ElementCompute}（FP32）交给
+activation。这个「先落 BF16、再算 activation」的次序与未融合链
+「GEMM 写 BF16、ATen 再算 GELU」一致，是设计意图。
+
+\texttt{IsEltActSupported} 一类标记是 fusion operation 的能力声明，CUTLASS
+用 \texttt{IsThreadEpilogueOp}\allowbreak\texttt{WithActivation} 把它归一成
+trait。本路径的接线不依赖运行时分支，但声明与实际实现必须一致：写了这个标记
+就表示该 operation 接受逐元素 activation。
+
+epilogue 只需要换 fusion operation，mainloop 的 dtype、layout 与 tile 参数
+没有变化：
+
+\begin{lstinputlisting}[linerange={378-402},firstnumber=auto,
+  title={cache-dit fp8/gemm/gemm.cuh L378--402（activation 版 collective 家族）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/gemm.cuh}
+\end{lstinputlisting}
+
+逐项对照 \texttt{Fp8RowEpilogue}：arch、OpClass、tile、cluster、epilogue tile、
+accumulator 与 compute 类型、C/D 类型与布局、alignment、schedule 全部相同，
+只有最后的 fusion operation 换成了
+\texttt{Fp8RowColScaleBias}\allowbreak\texttt{Activation}。
+\texttt{Fp8RowActivationMainloop} 与 \texttt{Fp8RowMainloop} 的差别只有
+\texttt{StageCountAuto}\allowbreak\texttt{Carveout} 里那个
+\texttt{SharedStorage} 大小——新 epilogue 需要多少 smem，就从预算里扣多少。
+这就是「换节点、不换流水」。
+
+per-block 侧同理，但 fusion operation 换成 \texttt{Fp8BiasOnlyActivation}：
+K128 块的 SFA/SFB 已经在 mainloop 里乘过，epilogue 只加 bias 和 activation。
+mainloop 仍是带 \texttt{\{data layout, scale layout\}} tuple 的那一份。
+
+粒度选择发生在 TU 层，不在模板内部。\texttt{per\_row.cu} 把 activation id
+翻译成模板实参：
+
+\begin{lstinputlisting}[linerange={14-27},firstnumber=auto,
+  title={cache-dit fp8/gemm/per\_row.cu L14--27（activation id 到模板实参）}]{../../../../cache-dit/csrc/kernels/fp8/gemm/per_row.cu}
+\end{lstinputlisting}
+
+per-row 与 per-tensor 共用带 \texttt{kPerTensor} 的同一个模板：模板实参只由
+activation 类型决定，\texttt{kPerTensor} 只改运行期 EVT 的 stride，源码注释
+写明不这么做会多出四次实例化。因此编译产物是 4 个 kernel 家族（row 两个变体、
+block 两个变体），dispatch 侧则是 6 个 launch 实例——三种粒度各两个 activation
+（erf 版与 tanh 版）。未知 activation id 直接报错，不会退化成
+「先 GEMM 再单独算 GELU」。
+
+\paragraph{SwiGLU：把门控搬进 producer}
+
+SwiGLU（式~\ref{eq:41-swiglu}）的融合点在下一层的量化 producer：门控、amax
+与量化合并成式~\ref{eq:41-swiglu-producer} 的一次调用。
+\texttt{fp8\_quantize\_swiglu} 需要
+同时支持两种写法：分离的 value/gate 两个张量，以及一次投影出 $2H$ 再切半的
+half-split。区别只在指针算术，所以先用一个小结构统一：
+
+\begin{lstinputlisting}[linerange={382-404},firstnumber=auto,
+  title={cache-dit fp8/quantize.cu L382--404（两种 SwiGLU 布局的统一读取）}]{../../../../cache-dit/csrc/kernels/fp8/quantize.cu}
+\end{lstinputlisting}
+
+\texttt{load8} 一次读 8 个 BF16（16\,B）。\texttt{gate == nullptr} 时，gate
+指到 value 同一行的后半段，即 half-split；否则读独立张量。循环体按
+式~\ref{eq:41-swiglu-round} 显式写两次舍入：先
+\texttt{\_\_float2bfloat16\_rn} 得到 BF16 的 silu，再与 BF16 的 value 相乘并
+再次舍入。舍入位置因此由代码钉死，不依赖编译器的融合策略；少一次舍入，
+amax 就可能不同。
+
+producer 的 per-row 版本把 CTA 组织成「256 个 lane 一行」，并在 shared memory
+里缓存门控结果：
+
+\begin{lstinputlisting}[linerange={406-434},firstnumber=auto,
+  title={cache-dit fp8/quantize.cu L406--434（per-row SwiGLU：第一遍逐 lane 求 amax 并缓存）}]{../../../../cache-dit/csrc/kernels/fp8/quantize.cu}
+\end{lstinputlisting}
+
+\texttt{kWarpsPerRow = 8} 让一个 CTA 恰好覆盖一行（$8\times32=256$ 个 lane），
+每个 lane 每次迭代读 8 个连续 BF16（16\,B），跨迭代步进 $256\times8=2048$
+个元素。第一遍既求 amax，又在
+\texttt{kCacheInput} 为真时把门控结果写进 smem。第一遍之后还差两级归约：
+\texttt{warp\_max} 在 warp 内取最大值，再由 \texttt{warp\_amax[]} 跨 8 个 warp
+取一次（这两段在 listing 区间外）。第二遍直接从 smem 取值量化：
+
+\begin{lstinputlisting}[linerange={448-463},firstnumber=auto,
+  title={cache-dit fp8/quantize.cu L448--463（第二遍复用缓存并写出 scale/qdata）}]{../../../../cache-dit/csrc/kernels/fp8/quantize.cu}
+\end{lstinputlisting}
+
+缓存有条件：启动器只在 $H\le 4096$ 时启用，每行上限 8\,KiB；更长的行改为第二
+遍重读 global memory，避免为缓存牺牲 occupancy。per-tensor 版本走另一条路：
+先 \texttt{cudaMemsetAsync} 清零，再用 \texttt{atomicMax} 对
+\texttt{\_\_float\_as\_uint(amax)} 求全局最大值，然后做一次
+\texttt{amax/448} 的收尾，最后一遍量化。per-block 版本一个 warp 一行，按 128
+切块，块内两遍读，正好对应 per-block 的 scale 布局。三种粒度都接受同一个
+\texttt{gate} 参数，H 必须是 16 的倍数，per-block 还要求 H 是 128 的倍数。
+
+Python 侧把布局、padding 与 half-split 的细节收在一个函数里：
+
+\begin{lstinputlisting}[linerange={73-104},firstnumber=auto,
+  title={cache-dit quantization/fp8/fused.py L73--104（SwiGLU 的 Python 入口）}]{../../../../cache-dit/src/cache_dit/quantization/fp8/fused.py}
+\end{lstinputlisting}
+
+\texttt{padded\_hidden} 取自 \texttt{down.quantized\_in\_features}。当逻辑宽度
+不是 128 的倍数时，half-split 先 \texttt{chunk(2)} 拆成 value/gate，再分别
+pad；顺序反过来会把 pad 列混进 gate。分离 gate 的写法不需要 chunk，直接 pad
+两路。最后 \texttt{forward\_quant} 只做 GEMM 与 depad，不再量化，
+因为 producer 已经把 qdata 与 scale 一起返回。
+
+\paragraph{结构化 pass 与两条硬边界}
+
+配置层的 \texttt{fp8\_fused\_mlp=True} 或 \texttt{--fp8-fused-mlp} 会调用
+\texttt{apply\_fused}\allowbreak\texttt{\_mlp\_passes}，依次识别三类结构：标准
+\texttt{FeedForward}（\texttt{GELU} 加前后两个 \texttt{QW8A8Linear}）、
+单流 \texttt{proj\_mlp}\allowbreak$\to$GELU\allowbreak$\to$concat
+（FLUX 形态），以及 SwiGLU
+（分离 gate 或 half-split）。识别结果按 pass 计数；一个都没识别到时报错，
+而不是静默留在未融合路径。
+
+单流形态有一个容易写错的地方：融合后 GELU 的 epilogue 已经算过一次激活，
+必须把原来的 \texttt{GELU} 模块替换成 identity，否则会激活两次。pass 里
+同时对 fc1 与 GELU 两个对象打标记，正是为了这一步。
+
+第一条硬边界是第二层的量化仍然存在。式~\ref{eq:41-mlp-quant} 的整行 amax
+需要跨 tile 归约，所以这里不承诺 SVDQ 那种本地 qout，也不消除 dense store。
+融合 MLP 节省的是「一次全张量的逐元素读写」，不是「一次量化」。
+
+第二条边界是后端。\texttt{fp8\_fused\_mlp} 只对 \texttt{cache\_dit} 原生 FP8
+有效，TorchAO、SVDQ、NVFP4 配置直接拒绝。请求 activation 而
+\texttt{use\_native=False} 时也会报错：\texttt{torch.\_scaled\_mm} 的公开
+schema 没有 activation epilogue，静默改为「GEMM 后再起一个 kernel」会掩盖
+配置意图，也让性能归因失真。
+
+\section{图示：scale 的位置与 layout 的两个阶段}
+
+图~\ref{fig:41-scale-placement} 把三种量化路径放在一起。判断 scale 该写在
+mainloop 还是 epilogue，先看它是否随 K 块变化：row/tensor 可以等完整点积
+结束后乘回；blockwise 必须在每个 K 块内折回；NVFP4 则同时存在 mainloop
+micro-scale 与 epilogue global-scale。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              minimum height=0.95cm},
+  arr/.style={-{Stealth[length=1.8mm]}, thick}]
+\node[box, draw=tkBlue, minimum width=2.7cm] (r1a) at (0,2.4) {FP8 row/tensor\\未缩放 mainloop};
+\node[box, draw=tkGreen, minimum width=3.5cm] (r1b) at (4.0,2.4) {EVT：$s_A,s_B$ + bias};
+\node[box, draw=tkPurple, minimum width=2.0cm] (r1c) at (8.1,2.4) {BF16 D};
+\draw[arr] (r1a) -- (r1b);
+\draw[arr] (r1b) -- (r1c);
+
+\node[box, draw=tkBlue, minimum width=2.7cm] (r2a) at (0,0.7) {FP8 blockwise\\K128 内施加 SFA/SFB};
+\node[box, draw=tkGreen, minimum width=3.5cm] (r2b) at (4.0,0.7) {EVT：只加 bias};
+\node[box, draw=tkPurple, minimum width=2.0cm] (r2c) at (8.1,0.7) {BF16 D};
+\draw[arr] (r2a) -- (r2b);
+\draw[arr] (r2b) -- (r2c);
+
+\node[box, draw=tkBlue, minimum width=2.7cm] (r3a) at (0,-1.0) {NVFP4 MMA\\消费 micro-scale};
+\node[box, draw=tkGreen, minimum width=3.5cm] (r3b) at (4.0,-1.0) {EVT：global-scale + bias};
+\node[box, draw=tkPurple, minimum width=2.0cm] (r3c) at (8.1,-1.0) {BF16 D};
+\draw[arr] (r3a) -- (r3b);
+\draw[arr] (r3b) -- (r3c);
+\end{tikzpicture}
+\caption{三种量化 GEMM 的 scale 位置。中间的绿色 EVT 看似相似，输入
+accumulator 已经经历的计算并不相同。}
+\label{fig:41-scale-placement}
+\end{figure}
+
+图~\ref{fig:41-layout-types} 进一步区分 blockwise 中最容易混淆的两个函数。
+左侧是类型系统，右侧是运行时内存寻址。二者必须来自同一个
+\texttt{ScaleConfig}，但承担的工作完全不同。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  panel/.style={draw, rounded corners=3pt, align=left, inner sep=5pt,
+                minimum width=5.4cm, minimum height=3.2cm},
+  lab/.style={font=\scriptsize\bfseries, text=tkBlue!80!black}]
+\node[panel, draw=tkBlue] (left) at (0,0) {
+  \textbf{编译期：deduce\_layoutSFA()}\\[3pt]
+  \quad 只用于 decltype\\
+  \quad 给出 $1\times128$ 粒度类型\\
+  \quad Builder 检查 tile 约束\\[4pt]
+  \quad 不读 scale、不分配内存};
+\node[panel, draw=tkGreen] (right) at (6.7,0) {
+  \textbf{运行期：tile\_atom\_to\_shape\_SFA()}\\[3pt]
+  \quad 输入实际 $M,N,K$\\
+  \quad 例：$M=256,K=512\Rightarrow G=4$\\
+  \quad 得到 $[256,4]$ row-major layout\\[4pt]
+  \quad offset$(m,g)=4m+g$};
+\node[lab] at (0,-2.15) {类型 $\longrightarrow$ mainloop 选择};
+\node[lab, text=tkGreen!70!black] at (6.7,-2.15) {值 $\longrightarrow$ scale 地址计算};
+\end{tikzpicture}
+\caption{SFA layout 的类型推导与运行时实例化。把 \texttt{deduce\_layoutSFA}
+当成 scale 计算函数，会把整个调用链解释错。}
+\label{fig:41-layout-types}
+\end{figure}
+
+图~\ref{fig:41-fused-mlp} 把两条融合链并排。上方 GELU 的融合点在 epilogue，
+下方 SwiGLU 的融合点在 producer；两条链都保留了第二层的量化。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              minimum height=0.95cm},
+  arr/.style={-{Stealth[length=1.8mm]}, thick},
+  lab/.style={font=\scriptsize\bfseries, text=tkBlue!80!black}]
+\node[lab] at (5.6,3.62) {GELU MLP：activation 进 epilogue};
+\node[box, draw=tkGreen, text width=3.2cm] (a1) at (0,2.4)
+  {fc1 GEMM\\EVT：$s_A,s_B$、bias、GELU};
+\node[box, draw=tkBlue, text width=1.4cm] (a2) at (4.45,2.4) {$H$（BF16）};
+\node[box, draw=tkOrange, text width=1.8cm] (a3) at (7.15,2.4) {量化\\整行 amax};
+\node[box, draw=tkPurple, text width=3.0cm] (a4) at (10.55,2.4)
+  {fc2 GEMM\\EVT：scale、bias};
+\node[box, draw=tkBlue, text width=0.8cm] (a5) at (13.15,2.4) {$Y$};
+\draw[arr] (a1) -- (a2);
+\draw[arr] (a2) -- (a3);
+\draw[arr] (a3) -- (a4);
+\draw[arr] (a4) -- (a5);
+\node[lab, text=tkOrange!70!black] at (8.15,1.12)
+  {第二层量化不能并入上一层：$s_m$ 依赖整行};
+
+\node[lab] at (6.2,-0.45) {SwiGLU MLP：gating 进 producer};
+\node[box, draw=tkBlue, text width=2.8cm] (b1) at (0,-1.65) {up / gate GEMM};
+\node[box, draw=tkGreen, text width=3.2cm] (b2) at (4.5,-1.65)
+  {producer：$v\odot\operatorname{silu}(g)$\\+ amax + E4M3};
+\node[box, draw=tkPurple, text width=3.0cm] (b3) at (9.0,-1.65)
+  {down GEMM\\EVT：scale、bias};
+\node[box, draw=tkBlue, text width=0.8cm] (b4) at (11.9,-1.65) {$Y$};
+\draw[arr] (b1) -- (b2);
+\draw[arr] (b2) -- (b3);
+\draw[arr] (b3) -- (b4);
+\node[lab, text=tkGreen!70!black] at (5.9,-2.92)
+  {$H$ 不再落成 BF16：两次舍入在 producer 内显式完成};
+\end{tikzpicture}
+\caption{两条融合链的边界。绿色是新增的融合点，橙色是保留下来的动态量化。
+GELU 链仍然写出并读回 $H$；SwiGLU 链把门控、amax 与量化合并在一次 producer
+调用里。}
+\label{fig:41-fused-mlp}
+\end{figure}
+
+\section{性能分析：默认配置之后还要看什么}
+
+本章性能表区分两类入口。FP8 eager 取 \texttt{chain\_default}，FP4 eager 取
+\texttt{chain\_native}（native collective 链），二者都包括在线 activation
+量化、GEMM 和 scale/bias 处理，并分别对 TorchAO 的 \texttt{chain}。
+\texttt{compile\_linear} 是完整 Linear 经 \texttt{torch.compile} 后的时延。
+
+FP4 另有 \texttt{cache\_dit\_chain}（\texttt{use\_native=False} 的
+\texttt{torch.\_scaled\_mm} 链），其六形状相对 TorchAO 的几何均值为 0.872，
+作为非 collective 对照保留在 JSON 中。比值统一写成
+$\texttt{cache\_dit}/\texttt{torchao}$，小于 1 表示 cache-dit 更快。
+测试使用 RTX PRO 5000、六组 FLUX Linear 形状、CUDA Event median，warmup 3、
+计时 10 次；FP4 另跑两轮取中位数。软件为 PyTorch 2.15.0+cu132、TorchAO
+0.18.0，cache-dit commit \texttt{eced0158}。以上两张表的每个数字都来自复测
+日志；融合 MLP 一节的两张表另属一套口径，见 \S6.1。
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+模式 & eager chain 几何均值 & compiled Linear 几何均值 & double\_attn 时延（ms） \\
+\midrule
+FP8 per-row    & 0.541 & 0.736 & 0.223 / 0.219 \\
+FP8 per-tensor & 0.569 & 0.724 & 0.230 / 0.227 \\
+FP8 per-block  & 0.385 & 0.457 & 0.239 / 0.315 \\
+NVFP4 2x       & 0.539 & 0.710 & 0.153 / 0.227 \\
+\bottomrule
+\end{tabular}
+\caption{cache-dit collective 相对 TorchAO 的时延比值。double\_attn 一列
+保留两个实现的原始中位数，其余列为六形状几何均值。}
+\label{tab:41-perf-summary}
+\end{table}
+
+表~\ref{tab:41-perf-summary} 同时给出支持与限制。eager 量化链在四种模式下
+都体现出明显收益；compiled Linear 的 per-row/per-tensor 在第一个形状上则
+与 TorchAO 接近，分别为 $1.020\times$ 和 $1.016\times$。这正说明不能从
+eager chain 直接外推编译路径。per-block 与 NVFP4 在本组形状上的整体比值
+更低，但也不能据此宣称所有模型、所有 shape 都占优。
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+形状（$M\times N\times K$） & per-row & per-tensor & per-block & NVFP4 \\
+\midrule
+$4096\times3072\times3072$   & 1.020 & 1.016 & 0.760 & 0.674 \\
+$4096\times12288\times3072$  & 1.004 & 1.025 & 0.701 & 0.737 \\
+$4096\times3072\times12288$  & 0.988 & 0.742 & 0.286 & 0.814 \\
+$4608\times3072\times3072$   & 0.526 & 0.572 & 0.375 & 0.640 \\
+$4608\times3072\times15360$  & 0.373 & 0.389 & 0.299 & 0.696 \\
+$4608\times12288\times3072$  & 0.797 & 0.834 & 0.535 & 0.713 \\
+\bottomrule
+\end{tabular}
+\caption{六组 FLUX 形状的 compiled Linear 时延比值（cache-dit/TorchAO）。}
+\label{tab:41-perf-shapes}
+\end{table}
+
+复测还暴露了两类无效臂，均未进入表格：benchmark 中 72 个旧
+\texttt{use\_ws} 臂在参数删除后报 \texttt{TypeError}；13 个独立量化 compile
+臂触发 \texttt{FailOnRecompileLimitHit}。有效的 \texttt{chain\_default} 与
+\texttt{compile\_linear} 覆盖全部表项。这里不能把脚本返回码 0 解读为
+“所有臂都成功”，必须逐行检查 JSON 的 \texttt{error} 字段。
+
+常规 BF16 示例没有在本机 SM120 上伪装成可运行配置，因此这里不列 BF16
+性能数字。它证明的是常规 Collective API 的代码结构与 SM90A 可编译性。
+FP8/FP4 表证明的是 SM120 低精度 collective 在真实量化链中的表现，三类
+证据不能混写。
+
+阅读结果时至少保留四个边界。第一，TorchAO 与 cache-dit 的量化粒度和
+融合方式不完全相同，性能接近不意味着逐 bit 等价。第二，完整 Linear 还含
+activation 量化与 Inductor 融合，不能只用 GEMM kernel 的峰值解释。第三，
+blockwise FP8 需要按 K128 块 rescale，寄存器压力与额外计算可能抵消部分
+主循环收益。第四，非对齐 shape 的 zero-pad/depad 保证数学有效区域不变，
+但会增加拷贝和无效计算；原生对齐的 Linear 在性能上更有利。
+
+因此，“直接使用 Collective API 获得合理性能基线”应落实为一套工作方法：先用默认
+collective 建立正确基线，再分别测量量化、GEMM、epilogue 与 host 开销，
+最后才调整 tile、stage 或融合边界。只比较一个孤立的 4096 立方 GEMM，不能
+推出整条模型路径的收益。
+
+\subsection{融合 MLP 的两条链}
+
+融合 MLP 要分开看三种口径：算子链、模型端到端、以及同一模式内的输出一致性。
+表~\ref{tab:41-fused-chain} 的几何取 FLUX 的 \texttt{double\_ff\_up} 形状
+（$M=4096$、$N=12288$、$K=3072$），unfused 与 fused 各自计时，rel-L2 以
+unfused 为参考。
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+链路 & unfused & fused & 加速比 & rel-L2 \\
+\midrule
+GELU MLP，$4096\times12288\times3072$   & 1.7031 ms & 1.5420 ms & $1.10\times$ & $5.547\times10^{-4}$ \\
+SwiGLU MLP，同几何 & 2.7356 ms & 2.3862 ms & $1.15\times$ & $0$ \\
+\bottomrule
+\end{tabular}
+\caption{融合 MLP 的算子链时延。SwiGLU 一行的 rel-L2 为零，表示与未融合链
+逐 bit 相同；GELU 一行不是。}
+\label{tab:41-fused-chain}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+模式 & BF16 & FP8 unfused & FP8 fused & fused 相对 unfused \\
+\midrule
+Eager   & 16.88 s & 9.53 s & 9.27 s & $1.03\times$ \\
+Compile & 14.82 s & 7.18 s & 7.11 s & $1.01\times$ \\
+\bottomrule
+\end{tabular}
+\caption{FLUX.1-dev 端到端时延（1024$\times$1024、28 步、seed 42）。融合在
+整条模型上只剩 1\%--3\%，因为 GEMM 与 attention 仍占主要时间。}
+\label{tab:41-fused-e2e}
+\end{table}
+
+表~\ref{tab:41-fused-chain} 与表~\ref{tab:41-fused-e2e} 的数字来自 cache-dit
+PR \#1371 的验收记录：GPU 为 RTX PRO 5000
+（SM120），CUDA Event 计时（warmup 10、计时 50 次，取中位数），
+PyTorch 2.15.0+cu132、cache-dit \texttt{453c1b05}。端到端采用官方 FLUX
+配置，warmup 1、repeat 3。本书修订时本机没有 SM120 设备与 FP8 扩展，\textbf{未
+复测这些数字}，只逐项核对了代码路径、几何与统计口径。
+
+为什么 SwiGLU 的收益更大，字节账只能给出方向。未融合的 GELU 链除了两次
+GEMM，还要为 $H$ 付出一次「GELU 读、GELU 写」，即 $4$\,B/元素；融合后这段
+读写消失。SwiGLU 链的中间量更多：silu 的结果要写一次，门控结果要写一次，再由
+量化读回；融合后 producer 只读 $v$ 与 $g$，写 qdata。但这些流量不必然比
+GELU 多一倍：$H=12288$ 超过 4096 的缓存阈值，producer 的第二遍还要重读
+$v$ 与 $g$，省下的净流量与 GELU 处于同一量级。实测差 5 个百分点，由 kernel
+数量、二次读的命中情况和两次 GEMM 的占比共同决定；本书没有做逐 kernel 的
+NCU 归因。可以确定的只有一点：chain 里两次 GEMM 的时间不变，不能按字节比例
+外推加速比，更不能据此推断其它 $M$ 或 $N$。
+
+端到端的两个数字说明另一件事：融合 MLP 改的是 MLP 段，不是 attention，也不是
+VAE 解码。整条链只快 1\%--3\%，与「算子链 1.10--1.15 倍」并不矛盾。PR 同时
+给出同一模式内 fused 与 unfused 的图像一致性：eager 为 PSNR 36.50、SSIM
+0.989，compile 为 33.70、0.988。这是「融合前后差多少」的一致性度量，不是
+「FP8 相对 BF16 的精度」；两组数也不能横向比较——36.50 与 33.70 各自对的是
+eager 与 compile 模式内的未融合链。
+
+\section{实践经验}
+
+\begin{kaogu}[F3]{cache-dit 两处 EVT 注释把 row/column 写反}
+cache-dit \texttt{fp8/gemm/gemm.cuh} 与 \texttt{fp4/gemm.cuh} 的局部注释
+在 \texttt{eced0158} 处仍把 \texttt{ColBroadcast} 说成输出列 scale、把 \texttt{RowBroadcast}
+说成输出行 scale。实际代码恰好相反：\texttt{ColBroadcast} 读取随 $m$
+变化的 activation global scale，\texttt{RowBroadcast} 读取随 $n$ 变化的
+weight global scale 与 bias。本章按节点类型和参数 stride 解释，不照抄
+该注释；完整记录见 \texttt{book/CHECKLOG.md}。
+\end{kaogu}
+
+\begin{kaogu}[F2]{Auto 标签仍然具有具体语义}
+\texttt{StageCountAuto}\allowbreak\texttt{Carveout} 是 shared-memory 预算扣除策略，
+\texttt{EpilogueTile}\allowbreak\texttt{Auto} 是 epilogue 子 tile 的自动选择，
+\texttt{KernelSchedule}\allowbreak\texttt{Auto} 则进入架构相关的 schedule 分派。把 Auto 读成
+“参数不存在”会错过实际的性能旋钮。相反，看到 Auto 就宣称库已完成全局
+最优搜索也没有依据；它选择合法且合理的实现，不负责证明当前模型与 shape
+下的最优性。
+\end{kaogu}
+
+\begin{kaogu}[F4]{GELU 融合不是逐 bit 等价}
+\texttt{Fp8RowColScaleBiasActivation} 的注释声明内层树仍先写 BF16、再算
+activation，因此与未融合链一致。这个次序在类型层面成立：内层节点的输出类型是
+\texttt{ElementOutput}（BF16），\texttt{Sm90Compute} 随后把它转成 FP32 交给
+activation。但实测 chain 级 rel-L2 为 $5.547\times10^{-4}$，不是零。差异最可能
+来自 activation 的实现：cache-dit 的扩展在 \texttt{setup.py} 里带
+\texttt{--use\_fast\_math} 构建，ATen 的 GELU 不带，tanh 的快速实现在个别输入
+上会跨过 BF16 的舍入边界。本书没有逐位定位来源，只把结论写清：GELU 融合与
+未融合链在 $10^{-4}$ 量级上一致，不是逐 bit。SwiGLU 侧的零差异来自另一处：
+式~\ref{eq:41-swiglu-round} 的两次舍入由代码显式写出，不依赖 ATen 的 epilogue
+实现。它固定的仍是舍入位置——producer 的 silu 用 \texttt{\_\_expf}，扩展整体
+带 \texttt{--use\_fast\_math}；逐 bit 相同是 PR 用例在对应规模上的实测结果
+（含 $H=500$ 的非对齐形状），不是任意输入的构造性保证。
+\end{kaogu}
+
+\begin{kaogu}[F2]{\texttt{\_scaled\_mm} 的 schema 没有 activation 位置}
+FP8 融合 MLP 的 activation 依赖 CUTLASS EVT。\texttt{torch.\_scaled\_mm} 的
+公开签名只暴露 scale、bias、输出 dtype 一类参数，没有 activation epilogue。
+因此 cache-dit 在 \texttt{use\_native=False} 时对带 activation 的请求直接报错，
+而不是悄悄再起一个逐元素 kernel。这是接口边界而不是性能取舍：静默降级会让
+调用者看到的时延里多出一次全张量读写，性能归因随之失效。
+\end{kaogu}
+
+\section{常见坑}
+
+\begin{enumerate}[itemsep=1pt,topsep=2pt]
+  \item \textbf{把 SM90 BF16 配方直接改成 SM120}。CUTLASS 4.8.1 的 SM120
+        dense Builder 只支持 F8F6F4，修改 \texttt{arch} 标签不会自动获得
+        BF16 collective。
+  \item \textbf{把 \texttt{ColumnMajor} 理解成一次转置拷贝}。本章的 B 仍是
+        物理 row-major $[N,K]$；column-major 只是同一内存的数学 $[K,N]$
+        解释。
+  \item \textbf{alignment 写成字节数}。模板参数以元素数计。BF16=8、FP32=4、
+        FP8=16、打包 FP4=32，在这些案例中都对应 16\,B。
+  \item \textbf{epilogue 模板参数错位}。accumulator 与 compute 之后才是
+        ElementC；把第三个 float 一概读成 C 类型，会误解整个 Builder。
+  \item \textbf{blockwise 又在 EVT 乘 scale}。K 相关 scale 已在 mainloop
+        施加，epilogue 只能加 bias，否则重复缩放。
+  \item \textbf{把 \texttt{deduce\_}\allowbreak\texttt{layoutSFA} 当运行时函数}。
+        它用于 \texttt{decltype} 的类型推导；实际寻址需要
+        \texttt{tile\_atom\_to\_shape\_}\allowbreak\texttt{SFA} 的运行时 layout 值。
+  \item \textbf{忽略量化 producer 的 scale 布局}。Builder 接受 layout 类型，
+        却不能修正已经写错的 scale 表。SFA/SFB 必须与量化器共同审查。
+  \item \textbf{把 zero-pad 当成零成本兼容}。零 qdata、零 scale 和零 bias
+        让有效输出区域不变，但 pad/depad 仍有拷贝与额外 tile 开销。
+  \item \textbf{忘记 workspace 与 stream}。\texttt{run} 必须进入调用者的
+        stream；非零 workspace 必须在同一设备上有效，并活到 kernel 完成。
+  \item \textbf{以为融合 MLP 能免掉第二层的量化}。整行 amax 需要跨 tile
+        归约，epilogue 里拿不到。融合省掉的是一次全张量读写，不是一次量化。
+  \item \textbf{用纯 Torch 的 \texttt{silu} 乘加代替 producer}。Inductor
+        可能把这条链留在 FP32，舍入次序与式~\ref{eq:41-swiglu-round} 不同，
+        amax 随之改变；逐 bit 一致要靠自定义算子的边界。
+  \item \textbf{把 half-split 当成分离 gate 传}。前者是 $[M,2H]$ 一个张量，
+        后者是两个 $[M,H]$。producer 用 \texttt{value.size(1)} 与
+        \texttt{2*cols} 的关系判定，传错直接报错；自行 pad 时若先 pad 再
+        \texttt{chunk}，pad 列会混进 gate。
+  \item \textbf{只替换第一层 Linear，忘了 GELU 模块}。epilogue 已经算过激活，
+        原 \texttt{GELU} 必须改成 identity，否则会激活两次。结构化 pass 同时
+        给两个对象打标记，就是为了覆盖这一步。
+\end{enumerate}
+
+\section{面试要点速查}
+
+\textbf{Q1：CollectiveBuilder 与 GemmUniversalAdapter 各负责什么？}
+
+Builder 在编译期生成 mainloop/epilogue 类型，决定数据搬运、MMA、流水和
+输出构件。Adapter 在 host 侧接收 problem shape、指针、stride、fusion 参数
+和 workspace，并执行 initialize/run。前者是类型构造，后者是调用接口。
+
+\textbf{Q2：为什么常规 GEMM 用 Collective API 能显著减少代码？}
+
+TMA、stage ring、MMA atom、寄存器 fragment 和默认 epilogue 都已有库实现。
+调用者只需声明数学类型、布局、tile、alignment 与 schedule。减少的是执行
+机制代码，不是数学约定和验证工作。
+
+\textbf{Q3：per-row 与 per-tensor 为什么可以共用一份 kernel？}
+
+两者的数学差别只是 scale 广播方式。per-row 的 scale stride 随 M/N 前进，
+per-tensor 把 stride 置零，同一标量在所有坐标复用。mainloop 与 EVT 类型
+不变，只改运行时参数。
+
+\textbf{Q4：FP8 per-block 为什么不能沿用 rowwise epilogue？}
+
+per-block scale 随 K 块变化。只有先对每个 K128 部分积施加对应 scale，再
+累加，才能得到正确结果。完整 accumulator 形成后已无法恢复每个 K 块各自
+的 scale 乘积。
+
+\textbf{Q5：\texttt{deduce\_layoutSFA} 与
+\texttt{tile\_atom\_to\_shape\_SFA} 有何区别？}
+
+前者提供编译期 layout 类型，供 Builder 选择 mainloop 并检查 scale
+granularity；后者用真实 M/N/K 生成运行时 layout 值，供 mainloop 计算
+scale 地址。前者不求值、不读数据，后者才描述实际内存映射。
+
+\textbf{Q6：NVFP4 的两级 scale 分别在哪里处理？}
+
+每 16 元素的 ue4m3 micro-scale 由 block-scaled mainloop/MMA 消费；每行
+activation 与每个输出通道 weight 的 FP32 global scale 由 EVT 折回，并在
+同一 epilogue 中加 bias。两级 scale 的类型、粒度和消费者都不同。
+
+\textbf{Q7：使用 Collective API 后还需要 NCU 吗？}
+
+需要。Builder 能选择合理实现，却不能证明当前 shape 的最优 tile、stage 和
+融合边界。NCU 用来判断 tensor pipe、DRAM/L2、shared memory、寄存器与
+occupancy 的瓶颈；是否改配置应由测量决定。
+
+\textbf{Q8：为什么 GELU 能进 epilogue，SwiGLU 的门控却要进 producer？}
+
+决定因素是后端而不是算子本身。GELU 是逐元素的，EVT 里加一个 compute 根节点
+就能在写回前完成，mainloop 不用改。SwiGLU 的门控需要两路投影的结果，而这两路
+是两次独立 GEMM 的输出；把它放进任一次 GEMM 的 epilogue 都拿不到另一路。
+放进下一层的量化 producer 则恰好满足条件：producer 本来就要读隐藏层的全部
+元素，门控所需的 $v$ 与 $g$ 都在手边，amax 的整行归约也在同一个 kernel 内。
+
+\textbf{Q9：融合之后能说「与未融合逐 bit 相同」吗？}
+
+不能一概而论。SwiGLU 可以：producer 显式写出 \texttt{silu} 与乘积的两次
+BF16 舍入，实测 rel-L2 为零。GELU 不行：实测 chain 级 rel-L2 为
+$5.547\times10^{-4}$，差异最可能来自 tanh 的快速实现与 ATen 的差异。工程上
+应分别声明，而不是用一个「融合等价」的口号覆盖两条链。
+
+\section{最小测试与动手实验}
+
+\subsection{BF16 头文件测试}
+
+测试文件 \texttt{book/tests/ch41\_cutlass\_collective.cu} 调用
+\texttt{collective\_}\allowbreak\texttt{gemm.cuh}，输入规模 $M=N=K=128$，CPU FP64 参考直接使用
+已经舍入到 BF16 的输入，输出保持 FP32，容差为 $10^{-3}$。SM90A 编译命令为：
+
+\begin{lstlisting}[style=console]
+cd kernels/interview/book/tests
+mkdir -p .build/ch41
+CUTLASS_HOME=${CUTLASS_HOME:-../../../../third-party/cutlass}
+nvcc -gencode arch=compute_90a,code=sm_90a -std=c++20 -O2 \
+  -I"$CUTLASS_HOME/include" -I../.. \
+  -o .build/ch41/ch41_cutlass_collective_sm90a \
+  ch41_cutlass_collective.cu
+./.build/ch41/ch41_cutlass_collective_sm90a
+# 也可将 CUTLASS_HOME 指向同级 cache-dit 的 CUTLASS 4.8.1；两版均已编译验证
+\end{lstlisting}
+
+本章构建环境没有 SM90 设备，因此完成 SM90A 编译验证但不执行该 kernel。
+相同源码以 SM120A 构建后按约定输出 \texttt{SKIP(ch41)}。FP8/FP4 的真实
+数值回归在 cache-dit 中运行：
+
+\begin{lstlisting}[style=console]
+cd ../../../../../cache-dit
+python -m pytest -q \
+  tests/kernels/test_fp8_ops.py tests/quantization/test_fp8_backend.py \
+  tests/kernels/test_fp4_ops.py tests/quantization/test_fp4_backend.py
+\end{lstlisting}
+
+本次共 81 项通过。它覆盖三种 FP8 模式、FP4 1x/2x、非对齐形状的
+pad/depad、fake/fullgraph 与 CUDA Graph 等路径；单个 BF16 示例的架构 SKIP
+不计入这 81 项。
+
+融合 MLP 的用例在同一个测试树里，对应文件如下：
+
+\begin{lstlisting}[style=console]
+cd ../../../../../cache-dit
+python -m pytest -q tests/kernels/test_fp8_ops.py \
+  tests/quantization/test_fp8_backend.py tests/quantization/test_fp8_cli.py \
+  tests/quantization/test_quantize_config.py
+\end{lstlisting}
+
+PR \#1371 的回归矩阵共 259 项通过（PR 验收记录，2026-11-19；本书未复跑）。
+其中与本节直接相关的是三类断言。第一，
+三种粒度乘四种结构（标准 GELU、单流 GELU、分离 gate SwiGLU、half-split
+SwiGLU）在 eager 与 \texttt{fullgraph} 编译下，与未融合链的 rel-L2 都小于
+$2\times10^{-3}$。第二，$H=500$ 这类非 128 对齐的 SwiGLU 在 eager 与 compile
+下与未融合链 \texttt{torch.equal}，对应式~\ref{eq:41-swiglu-round}。第三，
+打开 \texttt{fp8\_fused\_mlp} 却识别不到任何目标结构时报错。
+
+这组用例要求 SM100 以上的设备与已编译的 \texttt{\_C\_ops} 扩展，否则整组被
+\texttt{skip}。看到「全绿」之前要先确认不是整组跳过。本书修订环境是 SM86，
+没有重跑这组用例，只核对了用例覆盖与断言口径。
+
+\subsection{动手实验}
+
+\begin{enumerate}[itemsep=1pt,topsep=2pt]
+  \item 把 BF16 的 \texttt{TileShape} 从 $128\times128\times64$ 改为
+        $64\times128\times64$，比较编译期选择的 mainloop 与大 shape 下的
+        CTA 波次，不预设较小 tile 一定更快。
+  \item 将 per-tensor 的零 stride 改回 per-row stride，并传入全相同元素的
+        scale 向量，检查输出是否一致，再解释为什么内存访问方式不同。
+  \item 固定 $M=256,K=512$，用式~\ref{eq:41-sfa-offset} 手工计算
+        $(m,g)=(17,3)$ 的 SFA offset，并与量化器的写入下标对照。
+  \item 在 FP4 1x/2x 两条路径间只替换 epilogue，观察 mainloop 类型不变；
+        再把 global scale 错传给 mainloop，分析为何类型系统已经阻止这种
+        接法。
+  \item 对一个非 128 对齐的 Linear 测量 pad/depad 前后的有效输出与总时延，
+        将“结果数学等价”和“性能零开销”分开记录。
+  \item 把 \texttt{Fp8GeluTanh} 换成 \texttt{cutlass::epilogue::thread::GELU}，
+        与 \texttt{F.gelu(approximate="tanh")} 比较，量出 erf 版与 tanh 版的
+        差异，再解释为什么 API 上必须让调用者显式选择。
+  \item 在 $H=3072$ 与 $H=12288$ 上分别跑 producer 的
+        \texttt{kCacheInput=true/false} 两条实例，记录时延与 smem 占用，
+        验证 $H\le4096$ 这个阈值的取舍。
+  \item 手工计算 $H=500$、per-block 量化时 pad 后的宽度与 scale 元素数
+        （$H$ 应 pad 到 512，scale 数为 $M\times4$），再与
+        \texttt{fp8\_quantize\_swiglu} 的实参检查对齐。
+\end{enumerate}
+
+\subsection{延伸阅读}
+
+\begin{itemize}[itemsep=1pt,topsep=2pt]
+  \item @BBuf《CUTLASS 2.x \& 3.x Intro 学习笔记》：模板参数与 GEMM 结构，
+        \url{https://zhuanlan.zhihu.com/p/710516489}。
+  \item @reed《cute 之 简单 GEMM 实现》：从 CuTe 构件手写 GEMM 的对照路径，
+        \url{https://zhuanlan.zhihu.com/p/667521327}。
+  \item @reed《cute 之 GEMM 流水线》：流水与数据搬运背景，
+        \url{https://zhuanlan.zhihu.com/p/665082713}。
+  \item @Titus《GEMM 流水线：single/multi-stage、pipeline》：stage 与调度
+        概念，\url{https://zhuanlan.zhihu.com/p/712451053}。
+  \item NVIDIA CUTLASS 4.8.x 文档与示例 49/79/87：CollectiveBuilder、
+        Blackwell GeForce GEMM 与 blockwise GEMM，
+        \url{https://github.com/NVIDIA/cutlass/tree/v4.8.1/examples}。
+  \item cache-dit PR \#1371《feat: add fused MLP support for native FP8》：
+        EVT activation、SwiGLU producer 与结构化 pass 的完整改动与验收数据，
+        \url{https://github.com/vipshop/cache-dit/pull/1371}。
+  \item cache-dit 量化指南：\texttt{docs/user\_guide/QUANTIZATION.md} 中的
+        fused MLP 一节，列出三类结构、CLI 开关与两条硬边界。
+\end{itemize}

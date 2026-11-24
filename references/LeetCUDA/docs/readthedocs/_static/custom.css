@@ -1,0 +1,449 @@
+/* LeetCUDA book 站点样式：版心、图注、代码标题、实践经验框、页脚溯源。 */
+
+/* 三栏版式：左「篇 → 章」导航 + 正文 + 右「本页目录」（小节级）。
+   整体（侧栏 + 正文 + 目录）作为一组居中：侧栏左移一段，正文容器跟着右移同样距离，
+   两者紧贴、多余空白均分到两侧。注意不能只给正文栏加 auto 外边距——那样空白会跑到
+   侧栏与正文之间。 */
+
+/* 导航行按钮统一行高：主题按钮用 `line-height: normal`，同一行文字从中文换成拉丁
+   字母（英文模式下 Google 会把「上一页 / 下一页」也翻成英文）时行盒会矮 5px——
+   中文 19px、拉丁 14px，页面上就是「Previous Page 高、English 矮」这种不一致。
+   给行内所有按钮（含中英切换按钮）钉一个 24px 行高：6 + 24 + 8 + 2 = 40px，
+   中文、英文都一样高。 */
+.rst-breadcrumbs-buttons > .btn,
+.rst-footer-buttons > .btn,
+.rtd-translate-toggle,
+.rtd-sidebar-actions > .btn {
+  line-height: 24px;
+}
+
+/* 右上角「Go to repository」（`_templates/breadcrumbs.html` 的 `breadcrumbs_aside` 位）：
+   每个文档页都有（含 genindex / search），随面包屑行走、不做固定悬浮。样式对齐主题的
+   btn-neutral：白底、1px 灰边、3px 圆角；图标与文字间距 4px 与导航行按钮一致，且由
+   CSS 给而非空格文本节点——英文模式下 Google 翻译重写链接文字时不会塌成贴字。 */
+.wy-breadcrumbs-aside .rtd-repo-link {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 3px;
+  background: #fff;
+  font-size: 13px;
+  line-height: 18px;
+  color: #404040;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wy-breadcrumbs-aside .rtd-repo-link .fa {
+  margin-right: 4px;
+}
+
+.wy-breadcrumbs-aside .rtd-repo-link:hover {
+  background: #f3f6f8;
+  color: #2980b9;
+}
+
+/* 「下载 PDF」按钮（`_templates/breadcrumbs.html` / `footer.html` 里的静态锚点）与
+   「下一页」同一行：两者同为 `float-right`，浮动按 DOM 顺序从右往左排，所以它落在
+   「下一页」右边、紧贴它。不给外边距——这一行的按钮要求挨在一起（挨着「下一页」、
+   首页还挨着中英切换按钮），中间留缝反而突兀。 */
+.rst-breadcrumbs-buttons > .rtd-pdf-download,
+.rst-footer-buttons > .rtd-pdf-download {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* 中英切换按钮：沿用主题「上一页 / 下一页」的按钮样式与尺寸
+   （translate.js 里给的是 `btn btn-neutral` + FontAwesome 图标），插在「上一页」旁边。
+   不给外边距——这一行的按钮一律挨在一起（靠各自的 1px 边框分界）；间距只由侧栏那一行的
+   flex `gap` 提供，不靠这条。 */
+.rtd-translate-toggle {
+  text-decoration: none;
+}
+
+/* 按钮内图标与文字的间距一律由 CSS 给：模板（breadcrumbs/footer/layout）与
+   translate.js 的按钮里，图标前后都不留空格文本节点。英文模式下 Google 翻译重写
+   按钮文本（「上一页」→「Previous Page」）时会把图标旁的空格一并吞掉，间距塌到 0、
+   图标贴住文字（2026-10 线上实测；headless 里 Google 不可达，用「<font> 包裹 +
+   吞首尾空格」的模拟改写复现与验收）。4px 与原先空格的视觉宽度一致
+   （Lato 16px 空格 ≈ 4.4px），中英两种模式下按钮宽度基本不变。
+
+   选择器一律用后代关系、不写 `>`：Google 会把整段 inline 内容（图标 span 也在内）
+   包进 `<font style="vertical-align: inherit">`，直接子选择器会整体失配、margin
+   全塌（首版用 `>` 踩过，模拟包裹后 8/8 按钮 margin 归零）。
+
+   模板（breadcrumbs/footer/layout）与 translate.js 另外把同样的 4px **内联在图标
+   元素上**（`style="margin-right:4px"` / `fa-tail` 用 `margin-left:4px`）：内联不
+   依赖选择器命中，Google 怎么包裹、CSS 缓存到哪个版本都生效——这是 2026-10 线上
+   两轮失配后的兜底；本段规则是统一机制与兜底（改模板漏内联时仍有间距）。
+
+   垂直对齐同理：`<a class="btn">` 是主题默认的 middle，图标默认 baseline——英文
+   模式下 Google 给文字包的 `<font>` 带 `style="vertical-align: inherit"`，文字
+   继承到 middle 后比图标低 ~1px（「图标与文字不居中」的真正原因，2026-10 线上
+   实测 dy≈1px）。把 `a` 设为 baseline、图标取 `inherit`（继承同一个值）后，包裹
+   与未包裹两种状态都严格对齐（实测 dy=0）。 */
+.rst-breadcrumbs-buttons .btn,
+.rst-footer-buttons .btn,
+.rtd-sidebar-actions .btn,
+.rtd-translate-toggle {
+  vertical-align: baseline;
+}
+
+.rst-breadcrumbs-buttons .btn .fa,
+.rst-footer-buttons .btn .fa,
+.rtd-sidebar-actions .btn .fa,
+.rtd-translate-toggle .fa {
+  margin-right: 4px;
+  vertical-align: inherit;
+}
+
+/* 「下一页」的图标在文字后面（模板里带 `fa-tail` 标记）：间距给到左边。
+   同样不能用 `:last-child` 判断方向——文本节点不是元素子节点，图标在前后都只剩
+   它自己一个元素子，`:last-child` 会把所有图标一并命中（首版踩过）。 */
+.rst-breadcrumbs-buttons .btn .fa-tail,
+.rst-footer-buttons .btn .fa-tail {
+  margin-right: 0;
+  margin-left: 4px;
+}
+
+/* 没有「上一页」的页面（首页）里，切换按钮落在「下载 PDF」右边：按钮行是浮动布局，
+   先出现的贴右缘，所以它既得 `float: right`，DOM 上又要排在下载按钮前面（见
+   translate.js 的 buildButton）。有「上一页」的页面不套这条——那里的切换按钮跟在
+   「上一页」后面、按普通行内流排。 */
+.rst-breadcrumbs-buttons > .rtd-translate-toggle-right,
+.rst-footer-buttons > .rtd-translate-toggle-right {
+  float: right;
+  white-space: nowrap;
+}
+
+/* 侧栏搜索框下方那一行（`_templates/layout.html`）：只在页面没有「上一页 / 下一页」按钮行
+   时出现（本站是 genindex / search），此时「下载 PDF」与「English」都落在这里。flex 排成
+   「左下载、右切换」；窄侧栏（移动端抽屉只有 220px 上下可用宽）放不下就折行——切换按钮的
+   `margin-left: auto` 让它在第二行仍然右对齐，而不是被 `.wy-nav-side` 的
+   `overflow-x: hidden` 裁掉。 */
+.rtd-sidebar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 10px 12px;
+}
+
+/* 这一行里不沿用上面那条 `margin-left: 8px`：auto 外距把它顶到右边，也避免与 `gap` 叠成 16px。 */
+.rtd-sidebar-actions > .rtd-translate-toggle {
+  margin-left: auto;
+}
+
+.rtd-sidebar-actions .btn {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* translate.js 造的两条临时提示：本地预览用不了 Google 翻译的说明（showHint），以及英文
+   模式下翻完之前的进度提示与超时后的「read in Chinese」出口（createStatus）。落进侧栏
+   那一行时独占一行——整句文案（约 190px）跟按钮挤同一行会把按钮压变形。 */
+.rtd-translate-hint,
+.rtd-translate-status {
+  margin-left: 8px;
+  color: #b0b0b0;
+  font-size: 85%;
+}
+
+.rtd-sidebar-actions > .rtd-translate-hint,
+.rtd-sidebar-actions > .rtd-translate-status {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+.rtd-translate-status a {
+  margin-left: 4px;
+}
+
+/* 侧栏兜底容器：模板里没有 `.rtd-sidebar-actions` 那一行（旧版页面产物）时，
+   translate.js 的侧栏回退分支才自建它。新构建的页面走不到这里。 */
+.rtd-translate {
+  padding: 0 12px 10px 12px;
+  text-align: right;
+}
+
+.rtd-translate .btn {
+  margin-top: 4px;
+  text-decoration: none;
+}
+
+/* 英文模式下 Google 翻译会在页面顶部插一条横幅（「已翻译为以下语言 / 显示原文 / 选项」），
+   并给 body 写内联的 40px ``top`` 让位。横幅整条隐藏（切回中文有旁边的按钮）；那 40px
+   必须一并清掉——横幅是 ``position: fixed`` 且 z-index 极大：只藏横幅会在顶上留一条空白，
+   只清偏移不藏横幅则直接盖在正文上（实测两者都会发生）。
+
+   选择器得认两套：Google 换过实现，线上实测（2026-10-09）现在的横幅已经不带
+   ``goog-te-banner-frame`` 了，而是 ``div.skiptranslate`` 包装里的 ``iframe.skiptranslate``
+   （其余类名是混淆的 ``VIpgJd-…``，不能认）——只写老类名藏不掉，两条都留。顺带被这条
+   命中的还有它那两个「选项」菜单 iframe，同属一套 chrome。 */
+.goog-te-banner-frame,
+iframe.skiptranslate {
+  display: none !important;
+}
+
+body {
+  top: 0 !important;
+}
+
+/* 右栏：本页小节目录 */
+.rtd-page-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.rtd-page-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rtd-localtoc {
+  flex: 0 0 220px;
+  position: sticky;
+  top: 18px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding-left: 14px;
+  border-left: 1px solid #e1e4e5;
+  font-size: 88%;
+  line-height: 1.5;
+}
+
+.rtd-localtoc-title {
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  color: #404040;
+}
+
+.rtd-localtoc ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.rtd-localtoc li {
+  margin: 3px 0;
+}
+
+.rtd-localtoc ul ul {
+  padding-left: 12px;
+}
+
+.rtd-localtoc a {
+  color: #555;
+  text-decoration: none;
+}
+
+.rtd-localtoc a:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+/* 放不下三栏时隐藏右栏，正文恢复单栏宽度：三栏需要 300 + 800 + 28 + 220 = 1348px，
+   窄于此宽度硬塞会把正文压到 630px 以下。 */
+@media screen and (max-width: 1349px) {
+  .rtd-localtoc {
+    display: none;
+  }
+}
+
+@media screen and (min-width: 1100px) {
+  /* 无右栏时的布局：300（侧栏）+ 800（正文） */
+  .wy-nav-side {
+    left: max(0px, calc((100% - 1100px) / 2));
+  }
+
+  .wy-nav-content-wrap {
+    margin-left: calc(300px + max(0px, calc((100% - 1100px) / 2)));
+  }
+}
+
+@media screen and (min-width: 1350px) {
+  /* 有右栏：300 + 1048（正文 800 + 间距 28 + 目录 220） */
+  .wy-nav-content {
+    max-width: 1048px;
+  }
+
+  .wy-nav-side {
+    left: max(0px, calc((100% - 1348px) / 2));
+  }
+
+  .wy-nav-content-wrap {
+    margin-left: calc(300px + max(0px, calc((100% - 1348px) / 2)));
+  }
+}
+
+@media screen and (min-width: 1600px) {
+  /* 超宽屏正文放宽到 960：300 + 1208（960 + 28 + 220） */
+  .wy-nav-content {
+    max-width: 1208px;
+  }
+
+  .wy-nav-side {
+    left: max(0px, calc((100% - 1508px) / 2));
+  }
+
+  .wy-nav-content-wrap {
+    margin-left: calc(300px + max(0px, calc((100% - 1508px) / 2)));
+  }
+}
+
+.rst-content .rtd-caption {
+  margin: -0.4em 0 1.2em 0;
+  color: #555;
+  font-size: 90%;
+  text-align: center;
+}
+
+.rst-content .rtd-subcaption {
+  margin: -0.2em 0 0.8em 0;
+  color: #666;
+  font-size: 85%;
+  text-align: center;
+}
+
+.rst-content .rtd-admon {
+  border-radius: 2px;
+}
+
+.rst-content .rtd-admon.rtd-kaogu {
+  background: #fdf6e3;
+  border-color: #d9b56b;
+}
+
+.rst-content .rtd-admon.rtd-kaogu > .admonition-title {
+  background: #d9b56b;
+}
+
+.rst-content .rtd-admon.rtd-figure-fallback {
+  background: #fdecea;
+  border-color: #c0392b;
+}
+
+.rst-content .rtd-admon.rtd-figure-fallback > .admonition-title {
+  background: #c0392b;
+}
+
+.rst-content .rtd-admon.rtd-source-missing {
+  background: #eef3f8;
+  border-color: #7691a8;
+}
+
+.rst-content .rtd-admon.rtd-source-missing > .admonition-title {
+  background: #7691a8;
+}
+
+/* 表格：pandoc 直出的 <table> 不带主题类名，默认没有边框与内边距，看起来像一堆
+   对齐的文字。这里补上与主题 docutils 表一致的样式，并把表格居中：窄表按内容宽度
+   居中，宽表占满正文栏后在表内横向滚动（不撑破版心）。 */
+.rst-content table {
+  display: block;
+  overflow-x: auto;
+  width: fit-content;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 0 auto 24px;
+}
+
+.rst-content table th,
+.rst-content table td {
+  border: 1px solid #e1e4e5;
+  padding: 6px 10px;
+  line-height: 1.5;
+  vertical-align: top;
+}
+
+.rst-content table thead th {
+  background: #eaeef2;
+  font-weight: 700;
+}
+
+.rst-content table tbody tr:nth-child(2n) {
+  background: #f7f9fa;
+}
+
+.rst-content table caption {
+  caption-side: top;
+  font-weight: 700;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.rst-content table img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 表格里的图片由 raw HTML 引用，这里只为让 Sphinx 搬运文件而存在，不显示。 */
+.rst-content .rtd-hidden-ref {
+  display: none;
+}
+
+.rst-content .rtd-footer {
+  color: #888;
+  font-size: 85%;
+}
+
+.rst-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 过宽的显示公式（MathJax）在自身容器里横向滚动，避免撑出页面横向滚动条。
+   MathJax 会给这类公式写内联 `min-width`（CSS 里 min-width 压过 max-width），
+   所以必须用 !important 覆盖，否则页面上会出现整页横向滚动条。 */
+.rst-content mjx-container[display="true"] {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 图片居中：书里插图多包在 \begin{center} 里，那层排版环境在转换时剥掉了，网页上
+   默认靠左。只处理「独立成段」与「表格单元格里」的图，正文中夹在句子里的图不受
+   影响。 */
+.rst-content p > img:only-child {
+  display: block;
+  margin: 1.2em auto;
+}
+
+.rst-content td > img {
+  display: block;
+  margin: 0.3em auto;
+}
+
+/* 首页标题右侧的 Trendshift 徽章（`convert/__main__.py` 的 BOOK_BADGE 生成）：
+   浮动到标题右边，副标题在它左侧折行。
+
+   宽度按标题占位算：标题「LeetCUDA：CUDA Kernel 优化之路」实测 473px，正文栏只有
+   696px（视口 <1600px）与 856px（≥1600px）两档，所以默认 190px、宽屏 300px——
+   再宽标题就会被挤到第二行（250px 那版实测断成两行）。窄屏（移动端）取消浮动。 */
+.rst-content .rtd-trendshift {
+  float: right;
+  margin: -4px 0 12px 20px;
+}
+
+.rst-content .rtd-trendshift img {
+  display: block;
+  width: 190px;
+  max-width: 100%;
+  height: auto;
+}
+
+@media screen and (min-width: 1600px) {
+  .rst-content .rtd-trendshift img {
+    width: 300px;
+  }
+}
+
+@media screen and (max-width: 700px) {
+  .rst-content .rtd-trendshift {
+    float: none;
+    margin: 0 0 16px 0;
+  }
+}

@@ -1,0 +1,155 @@
+import ctypes
+from typing import Any, Dict, List
+
+import torch
+from core.challenge_base import ChallengeBase, OutTensor, RandTensor
+
+
+class Challenge(ChallengeBase):
+    name = "1D Convolution"
+    atol = 0.0001
+    rtol = 0.0001
+    num_gpus = 1
+    access_tier = "free"
+
+    def reference_impl(
+        self,
+        input: torch.Tensor,
+        kernel: torch.Tensor,
+        output: torch.Tensor,
+        input_size: int,
+        kernel_size: int,
+    ):
+        assert input.shape == (input_size,)
+        assert kernel.shape == (kernel_size,)
+        assert output.shape == (input_size - kernel_size + 1,)
+        assert input.dtype == kernel.dtype == output.dtype
+        assert input.device == kernel.device == output.device
+
+        # Create strided view of input for all windows
+        windows = input.unfold(0, kernel_size, 1)
+
+        # Use einsum for explicit cross-correlation
+        # 'ij,j->i' means: for each window i, multiply with kernel j and sum over j
+        output.copy_(torch.einsum("ij,j->i", windows, kernel))
+
+    def reference_impl_jax(self, input, kernel, input_size, kernel_size):
+        import jax
+
+        # Cross-correlation, valid padding, stride 1.
+        # Shapes: input (N=1, C=1, W), kernel (O=1, I=1, W).
+        lhs = input.reshape(1, 1, input_size)
+        rhs = kernel.reshape(1, 1, kernel_size)
+        result = jax.lax.conv_general_dilated(
+            lhs,
+            rhs,
+            window_strides=(1,),
+            padding="VALID",
+            precision=jax.lax.Precision.HIGHEST,
+        )
+        return result.reshape(-1)
+
+    def get_solve_signature(self) -> Dict[str, tuple]:
+        return {
+            "input": (ctypes.POINTER(ctypes.c_float), "in"),
+            "kernel": (ctypes.POINTER(ctypes.c_float), "in"),
+            "output": (ctypes.POINTER(ctypes.c_float), "out"),
+            "input_size": (ctypes.c_int, "in"),
+            "kernel_size": (ctypes.c_int, "in"),
+        }
+
+    def generate_example_test(self) -> Dict[str, Any]:
+        dtype = torch.float32
+        input_tensor = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0], device=self.device, dtype=dtype)
+        kernel_tensor = torch.tensor([1.0, 0.0, -1.0], device=self.device, dtype=dtype)
+        output_tensor = torch.empty(3, device=self.device, dtype=dtype)
+        return {
+            "input": input_tensor,
+            "kernel": kernel_tensor,
+            "output": output_tensor,
+            "input_size": 5,
+            "kernel_size": 3,
+        }
+
+    def generate_functional_test(self) -> List[Dict[str, Any]]:
+        dtype = torch.float32
+        test_specs = [
+            # Basic test cases
+            ("basic_5x3", [1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 0.0, -1.0]),
+            ("basic_4x2", [2.0, 4.0, 6.0, 8.0], [0.5, 0.2]),
+            ("identity_kernel", [1.0, 2.0, 3.0, 4.0], [1.0]),
+            ("edge_detection", [1.0, 1.0, 1.0, 0.0, 0.0, 0.0], [1.0, -1.0]),
+            ("smoothing", [1.0, 2.0, 3.0, 4.0, 5.0], [0.25, 0.5, 0.25]),
+        ]
+
+        test_cases = []
+        for _, input_vals, kernel_vals in test_specs:
+            input_size = len(input_vals)
+            kernel_size = len(kernel_vals)
+            output_size = input_size - kernel_size + 1
+            test_cases.append(
+                {
+                    "input": torch.tensor(input_vals, device=self.device, dtype=dtype),
+                    "kernel": torch.tensor(kernel_vals, device=self.device, dtype=dtype),
+                    "output": torch.empty(output_size, device=self.device, dtype=dtype),
+                    "input_size": input_size,
+                    "kernel_size": kernel_size,
+                }
+            )
+
+        # Random test cases with different sizes
+        for _, input_size, kernel_size in [
+            ("small_conv", 10, 3),
+            ("medium_conv", 100, 7),
+            ("large_conv", 1000, 15),
+            ("wide_kernel", 50, 20),
+            ("narrow_kernel", 200, 2),
+        ]:
+            output_size = input_size - kernel_size + 1
+            test_cases.append(
+                {
+                    "input": torch.empty(input_size, device=self.device, dtype=dtype).uniform_(
+                        -10.0, 10.0
+                    ),
+                    "kernel": torch.empty(kernel_size, device=self.device, dtype=dtype).uniform_(
+                        -1.0, 1.0
+                    ),
+                    "output": torch.empty(output_size, device=self.device, dtype=dtype),
+                    "input_size": input_size,
+                    "kernel_size": kernel_size,
+                }
+            )
+
+        # Edge cases
+        for _, input_size, kernel_size in [
+            ("min_input", 1, 1),
+            ("kernel_equals_input", 10, 10),
+            ("large_input_small_kernel", 10000, 3),
+        ]:
+            output_size = input_size - kernel_size + 1
+            test_cases.append(
+                {
+                    "input": torch.empty(input_size, device=self.device, dtype=dtype).uniform_(
+                        -1.0, 1.0
+                    ),
+                    "kernel": torch.empty(kernel_size, device=self.device, dtype=dtype).uniform_(
+                        -0.1, 0.1
+                    ),
+                    "output": torch.empty(output_size, device=self.device, dtype=dtype),
+                    "input_size": input_size,
+                    "kernel_size": kernel_size,
+                }
+            )
+
+        return test_cases
+
+    def generate_performance_test(self) -> Dict[str, Any]:
+        input_size, kernel_size = 1500000, 2047  # Large convolution for performance testing
+        output_size = input_size - kernel_size + 1
+        return {
+            "input": RandTensor((input_size,), -1.0, 1.0),
+            "kernel": RandTensor((kernel_size,), -1.0, 1.0),
+            "output": OutTensor((output_size,)),
+            "input_size": input_size,
+            "kernel_size": kernel_size,
+        }
