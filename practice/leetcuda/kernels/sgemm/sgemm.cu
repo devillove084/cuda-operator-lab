@@ -462,7 +462,7 @@ __global__ void sgemm_t_8x8_sliced_k_f32x4_bcf_dbuf_kernel(
 
 // 计算剩下最后一块BK
   // Which buffer holds the final tile depends on parity of the loop's
-+ // last iteration (bk = numTiles - 1), matching smem_sel_next's formula.
+  // last iteration (bk = numTiles - 1), matching smem_sel_next's formula.
   int smem_sel_last = ((K + BK - 1) / BK - 1) & 1;
 
 #pragma unroll

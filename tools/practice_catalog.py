@@ -15,6 +15,7 @@ from time import time_ns
 from urllib.parse import unquote
 
 from practice_leetcuda_cases import leetcuda_cases
+from practice_leetcuda_suites import suite_cases
 
 ROOT = Path(__file__).resolve().parent.parent
 PLATFORMS = {"leetgpu": "LeetGPU", "leetcuda": "LeetCUDA", "xpuoj": "XPUOJ"}
@@ -398,6 +399,25 @@ def run_judge(command, folder, env, timeout):
         raise
 
 
+def run_suite(problem, mode, case, command, folder, env):
+    specs = suite_cases(problem.title, problem.key, mode)
+    entries = list(enumerate(specs, start=1))
+    if case is not None:
+        entries = [(number, entry) for number, entry in entries if number == case]
+    if not entries:
+        raise ValueError(f"共享套件的用例编号为 1 到 {len(specs)}。")
+    for number, entry in entries:
+        print(f"套件 #{number} · {entry.label} · {entry.specification}", flush=True)
+        if mode == "ffpa":
+            argv = [*command, "--case", str(number)]
+        elif isinstance(mode, Path):
+            argv = [sys.executable, "-u", str(ROOT / "tools" / "practice_driver.py"),
+                    command[2], str(2026 if number == 1 else 2041 + number - 2),
+                    *command[3:], *entry.args]
+        else:
+            argv = [*command, *entry.args]
+        run_leetcuda(argv, folder, env, problem, "test")
+
 def test(problem, args):
     action = args.action
     case = args.case
@@ -408,11 +428,21 @@ def test(problem, args):
         raise ValueError(f"{test_description(problem)}。可打开题面和实现文件。")
     if action == "test" and problem.platform == "leetcuda":
         numbered = isinstance(mode, Path) and leetcuda_cases(mode.stem, problem.title)
-        if not numbered and (case is not None or args.timeout is not None):
-            raise ValueError("这个算子级入口不支持 --case 或 --timeout。")
+        if not numbered and args.timeout is not None:
+            raise ValueError("共享套件不支持 --timeout。")
     env = os.environ.copy()
     select_gpu(env)
     env.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
+    if isinstance(mode, Path) and "TORCH_CUDA_ARCH_LIST" not in env:
+        device = env["CUDA_VISIBLE_DEVICES"].split(",")[0].strip()
+        if device:
+            capability = subprocess.run(
+                ["nvidia-smi", "-i", device, "--query-gpu=compute_cap", "--format=csv,noheader"],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            )
+            architecture = capability.stdout.strip()
+            if capability.returncode == 0 and re.fullmatch(r"\d+\.\d+", architecture):
+                env["TORCH_CUDA_ARCH_LIST"] = architecture
     env.setdefault("MAX_JOBS", "2")
 
     print(f"GPU {env['CUDA_VISIBLE_DEVICES']} · {PLATFORMS[problem.platform]} #{problem.key}",
@@ -432,8 +462,12 @@ def test(problem, args):
             fcntl.flock(handle, fcntl.LOCK_EX)
             subprocess.run([sys.executable, "setup.py", "build_ext", "--inplace"],
                            cwd=FFPA_WORKSPACE, env=env, check=True)
-            run_leetcuda([sys.executable, "-u", str(ROOT / "tools" / "practice_ffpa.py"),
-                          problem.key, action], FFPA_WORKSPACE, env, problem, action)
+            command = [sys.executable, "-u", str(ROOT / "tools" / "practice_ffpa.py"),
+                       problem.key, action]
+            if action == "test":
+                run_suite(problem, mode, case, command, FFPA_WORKSPACE, env)
+            else:
+                run_leetcuda(command, FFPA_WORKSPACE, env, problem, action)
         return
     if mode == "interview":
         folder = LEETCUDA_WORKSPACE / "kernels" / "interview"
@@ -454,11 +488,9 @@ def test(problem, args):
         command = [str(binary)]
         if action == "bench":
             command.extend(["--bench", "--mnk", "2048"])
-        elif problem.key == "213":
-            command.extend(["--fp4-gemm", "512", "512", "512"])
-        elif problem.path is None:
-            command.append("--pd-cute")
-        run_leetcuda(command, folder, env, problem, action)
+            run_leetcuda(command, folder, env, problem, action)
+        else:
+            run_suite(problem, mode, case, command, folder, env)
         return
     if isinstance(mode, Path):
         workspace_script = leetcuda_workspace(mode)
@@ -469,20 +501,28 @@ def test(problem, args):
                 command.extend(["--case", str(case)])
             run_judge(command, workspace_script.parent, env, args.timeout)
             return
-        if case is not None:
-            raise ValueError("这个上游脚本按整个算子运行，无法指定 --case。")
-        print(f"运行 {mode.name}。检查方式由该脚本决定，有些脚本只打印输出和耗时。",
-              flush=True)
+        if case is not None and action != "test":
+            raise ValueError("共享套件的 --case 用于 test。")
+        print(f"共享驱动 {mode.name} · 数值校验由驱动提供", flush=True)
         command = [sys.executable, "-u", workspace_script.name]
         if mode.name == "hgemm.py":
             env.setdefault("NVCC_CCBIN", "/opt/rh/gcc-toolset-12/root/usr/bin/g++")
-            command.extend(["--MNK", "1024", "--cuda-all", "--wmma-all", "--mma-all",
+            command.extend(["--cuda-all", "--wmma-all", "--mma-all",
                             "--mma-tn", "--cute-tn", "--torch", "--show-a", "--force-build"])
+            if action == "test":
+                env["PRACTICE_VERIFY_HGEMM"] = "1"
+                command.extend(["--warmup", "1", "--iters", "1"])
+            else:
+                command.extend(["--MNK", "1024"])
         elif mode.name == "flash_attn_mma.py":
             env.setdefault("NVCC_CCBIN", "/opt/rh/gcc-toolset-12/root/usr/bin/g++")
-            command.extend(["--B", "1", "--H", "8", "--N", "512", "--D", "64",
-                            "--sdpa", "--check", "--f32", "--build-others", "--seed", "2026"])
-        run_leetcuda(command, workspace_script.parent, env, problem, action)
+            if action == "bench":
+                command.extend(["--B", "1", "--H", "8", "--N", "512", "--D", "64",
+                                "--sdpa", "--check", "--f32", "--build-others", "--seed", "2026"])
+        if action == "test":
+            run_suite(problem, mode, case, command, workspace_script.parent, env)
+        else:
+            run_leetcuda(command, workspace_script.parent, env, problem, action)
         return
     source = solution(problem, create=True)
     command = [sys.executable, "-u", str(ROOT / "tools" / "practice_check.py"),

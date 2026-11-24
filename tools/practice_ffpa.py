@@ -1,18 +1,24 @@
 """Validate the editable native FFPA extension on large-head prefill and split-KV decode."""
+import argparse
 from statistics import median
-import sys
 
 import torch
 import torch.nn.functional as F
 from ffpa_attn import ffpa_attn_func
 from ffpa_attn.functional import CUDABackend
 
-key, action = sys.argv[1:]
-decode = key in ("192", "193")
-acc = "f16" if key == "190" else "f32"
+parser = argparse.ArgumentParser()
+parser.add_argument("key")
+parser.add_argument("action", choices=("test", "bench"))
+parser.add_argument("--case", type=int, choices=(1, 2, 3))
+args = parser.parse_args()
+decode = args.key in ("192", "193")
+acc = "f16" if args.key == "190" else "f32"
 backend = CUDABackend(forward=True, acc=acc, stages=2)
 torch.manual_seed(2026)
-for head_dim, length in ((320, 512), (512, 1024)):
+for number, (head_dim, length) in enumerate(((320, 512), (512, 1024), (320, 2048)), start=1):
+    if args.case is not None and args.case != number:
+        continue
     q_len = 1 if decode else length
     q = torch.randn((1, 4, q_len, head_dim), device="cuda", dtype=torch.float16)
     k = torch.randn((1, 4, length, head_dim), device=q.device, dtype=q.dtype)
@@ -26,7 +32,7 @@ for head_dim, length in ((320, 512), (512, 1024)):
 
     torch.testing.assert_close(evaluate(), reference(), rtol=1e-2, atol=1e-2)
     print(f"PASS CUDA FFPA Nq={q_len} Nkv={length} D={head_dim} acc={acc}", flush=True)
-    if action == "bench":
+    if args.action == "bench":
         for label, call in (("FFPA native CUDA", evaluate), ("PyTorch SDPA", reference)):
             for _ in range(8):
                 call()

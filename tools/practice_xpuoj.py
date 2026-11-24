@@ -1,9 +1,12 @@
 """Deterministic offline inputs for XPUOJ statements that publish a PyTorch baseline."""
+from contextvars import ContextVar
 import math
 import re
 from typing import List, Optional
 
 import torch
+
+from practice_workloads import BASE_SEED, Case
 
 
 # Run a larger workload as well for representative bandwidth- and compute-bound families.
@@ -15,6 +18,31 @@ LARGE_CASES = {
 
 def case_numbers(key):
     return (1, 2, 3) if key in LARGE_CASES else (1, 2)
+
+
+input_scale = ContextVar("xpuoj_input_scale", default=0.25)
+
+
+def case_plan(key):
+    plan = []
+    shapes = case_numbers(key)
+    scales = ((0.25, "题面参考用例"), (0.015625, "小幅值"),
+              (0.75, "较宽幅值"), (0.25, "独立随机种子"))
+    for profile, (scale, label) in enumerate(scales):
+        for variant in shapes:
+            number = len(plan) + 1
+            details = f"{label} · 形状方案 {variant} · 种子 {BASE_SEED + number}"
+            if profile:
+                details += " · 缓冲区守卫"
+            def make(variant=variant, scale=scale, number=number):
+                torch.manual_seed(BASE_SEED + number)
+                token = input_scale.set(scale)
+                try:
+                    return case_inputs(key, variant)
+                finally:
+                    input_scale.reset(token)
+            plan.append(Case(number, details, make, guarded=profile > 0))
+    return plan
 
 
 def baseline(problem):
@@ -42,7 +70,7 @@ def baseline(problem):
 
 
 def random(shape, dtype=torch.bfloat16):
-    return torch.randn(shape, dtype=torch.float32, device="cuda").mul_(0.25).to(dtype)
+    return torch.randn(shape, dtype=torch.float32, device="cuda").mul_(input_scale.get()).to(dtype)
 
 
 def zeros(shape, dtype=torch.bfloat16):

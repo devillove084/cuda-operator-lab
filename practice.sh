@@ -94,7 +94,7 @@ usage() {
 ./practice.sh list [all|todo|done] [题库|all]           列出题目与离线测试支持
 ./practice.sh show|edit|test|toggle 题库 题号           查看、编辑、测试或切换完成状态
 ./practice.sh cases [题库 [题号]]                      统计用例或查看题目的输入规格
-./practice.sh test 题库 题号 --case 1                  重跑独立判题的某个用例
+./practice.sh test 题库 题号 --case 1                  重跑指定用例
 ./practice.sh bench 题库 题号                        对照基线，保存延迟分布
 ./practice.sh profile 题库 题号 [--tool ncu]             保存 Nsight Systems 时间线
 ./practice.sh audit                                    检查题库、练习文件和测试入口

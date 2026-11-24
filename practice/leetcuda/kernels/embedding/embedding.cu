@@ -53,6 +53,12 @@ __global__ void embedding_f16_kernel(const int *idx, half *weight, half *output,
   output[bx * emb_size + tx] = weight[offset + tx];
 }
 
+// This catalog variant only had a title in the upstream release.
+__global__ void embedding_f16x2_kernel(const int *idx, half *weight,
+                                      half *output, int n, int emb_size) {
+  // TODO: Gather two FP16 elements per thread from the selected row.
+}
+
 __global__ void embedding_f16x8_kernel(const int *idx, half *weight,
                                        half *output, int n, int emb_size) {
   int tx = threadIdx.x * 8;
@@ -115,6 +121,7 @@ TORCH_BINDING_EMBEDDING(f32, torch::kFloat32, float, 1)
 TORCH_BINDING_EMBEDDING(f32x4, torch::kFloat32, float, 4)
 TORCH_BINDING_EMBEDDING(f32x4_pack, torch::kFloat32, float, 4)
 TORCH_BINDING_EMBEDDING(f16, torch::kHalf, half, 1)
+TORCH_BINDING_EMBEDDING(f16x2, torch::kHalf, half, 2)
 TORCH_BINDING_EMBEDDING(f16x8, torch::kHalf, half, 8)
 TORCH_BINDING_EMBEDDING(f16x8_pack, torch::kHalf, half, 8)
 
@@ -123,6 +130,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   TORCH_BINDING_COMMON_EXTENSION(embedding_f32x4);
   TORCH_BINDING_COMMON_EXTENSION(embedding_f32x4_pack);
   TORCH_BINDING_COMMON_EXTENSION(embedding_f16);
+  TORCH_BINDING_COMMON_EXTENSION(embedding_f16x2);
   TORCH_BINDING_COMMON_EXTENSION(embedding_f16x8);
   TORCH_BINDING_COMMON_EXTENSION(embedding_f16x8_pack);
 }

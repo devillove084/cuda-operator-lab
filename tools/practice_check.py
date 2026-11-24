@@ -14,6 +14,7 @@ from practice_catalog import (
     ENTRYPOINT, find_problem, leetgpu_template, local_test, xpu_cuda_statement,
 )
 from practice_verdict import Judge, SubmissionError, fail
+from practice_workloads import BASE_SEED, Case, guarded_copy, published_replays, verify_guards
 
 SCALARS = {
     "bool": ctypes.c_bool,
@@ -145,17 +146,42 @@ def upstream_leetgpu(problem):
     return load_module("public_leetgpu_challenge", problem.path.parent / "challenge.py").Challenge()
 
 
-def matching_tests(challenge, case):
-    if case == 0:
-        return [(0, challenge.generate_example_test())]
-    cases = challenge.generate_functional_test()
-    if case is not None:
-        if not 1 <= case <= len(cases):
-            raise ValueError(f"功能用例编号为 1 到 {len(cases)}，样例编号为 0。")
-        return [(case, cases[case - 1])]
-    if not cases:
+def leetgpu_plan(challenge):
+    torch.manual_seed(BASE_SEED)
+    examples = challenge.generate_functional_test()
+    if not examples:
         raise ValueError("公开配置没有功能用例。")
-    return enumerate(cases, start=1)
+
+    def reload(number, seed):
+        torch.manual_seed(seed)
+        return challenge.generate_functional_test()[number - 1]
+
+    return [
+        *(Case(number, "公开功能用例", lambda case=case: case)
+          for number, case in enumerate(examples, start=1)),
+        *published_replays(len(examples), reload, len(examples) + 1),
+    ]
+
+
+def selected_cases(plan, case):
+    if case is None:
+        return plan
+    selected = [workload for workload in plan if workload.number == case]
+    if not selected:
+        raise ValueError(f"用例编号为 1 到 {len(plan)}。")
+    return selected
+
+
+def candidate_arguments(values, case):
+    copies, guards = {}, {}
+    for key, value in values.items():
+        guarded = guarded_copy(value) if case.guarded else None
+        if guarded is None:
+            copies[key] = clone(value)
+        else:
+            copies[key], *guard = guarded
+            guards[key] = guard
+    return copies, guards
 
 
 def clone(value):
@@ -178,21 +204,35 @@ def leetgpu_cases(challenge, case, invoke, abi=None):
     outputs = [name for name, (_, role) in signature.items() if role in ("out", "inout")]
     if not outputs:
         raise ValueError("公开接口没有可比较的输出。")
-    tests = list(matching_tests(challenge, case))
+    if case == 0:
+        tests = [Case(0, "公开样例", challenge.generate_example_test)]
+    else:
+        tests = selected_cases(leetgpu_plan(challenge), case)
     judge = Judge(len(tests))
-    for number, test in tests:
-        actual = {name: clone(test[name]) for name in signature}
-        reference = {name: test[name] for name in signature}
+    for workload in tests:
+        number, data = workload.number, workload.factory()
+        initial = {name: data[name] for name in signature}
+        actual, guards = candidate_arguments(initial, workload)
+        reference = {name: clone(initial[name]) for name in signature}
         challenge.reference_impl(**reference)
         torch.cuda.synchronize()
         arguments = list(actual.values()) if abi is None else cuda_args(actual.values(), abi)
         judge.run(number, invoke, arguments, torch.cuda.synchronize)
+        verify_guards(judge, number, guards)
         for name in outputs:
             try:
                 torch.testing.assert_close(actual[name], reference[name], atol=challenge.atol,
                                            rtol=challenge.rtol, equal_nan=True)
             except AssertionError as error:
                 judge.wrong(number, f"输出 {name} 不匹配\n{error}")
+        if workload.guarded:
+            for name, (_, role) in signature.items():
+                if role == "in" and isinstance(initial[name], torch.Tensor):
+                    try:
+                        torch.testing.assert_close(actual[name], initial[name], atol=0, rtol=0,
+                                                   equal_nan=True)
+                    except AssertionError as error:
+                        judge.wrong(number, f"只读输入 {name} 被修改\n{error}")
         judge.accept(number)
     judge.finish()
 
@@ -209,35 +249,46 @@ def xpu_case_sizes(config, number):
     return sizes
 
 
+def xpu_public_plan(config):
+    def make(number, seed):
+        torch.manual_seed(seed)
+        sizes = xpu_case_sizes(config, number)
+        return sizes, config.genTestCase(sizes)
+
+    total = config.getNumOfTestcases()
+    return [
+        *(Case(number, "官方公开题包", lambda n=number: make(n, BASE_SEED + n))
+          for number in range(1, total + 1)),
+        *published_replays(total, make, total + 1),
+    ]
+
+
 def xpu_cases(problem, case, path):
     config = load_module("public_xpuoj_config", problem.pack / "testcase_config.py")
     abi = read_abi(ENTRYPOINT.search(xpu_cuda_statement(problem))[0])
     evaluate = cuda_function(path, "run_kernel", abi)
-    total = config.getNumOfTestcases()
-    if case is not None and not 1 <= case <= total:
-        raise ValueError(f"功能用例编号为 1 到 {total}。")
-    numbers = range(1, total + 1) if case is None else [case]
-    judge = Judge(len(numbers))
-    for number in numbers:
-        torch.manual_seed(2026 + number)
-        sizes = xpu_case_sizes(config, number)
-        original = config.genTestCase(sizes)
-        actual = [clone(value) for value in original]
+    tests = selected_cases(xpu_public_plan(config), case)
+    judge = Judge(len(tests))
+    for workload in tests:
+        number = workload.number
+        sizes, original = workload.factory()
+        actual, guards = candidate_arguments(dict(enumerate(original)), workload)
         reference = [clone(value) for value in original]
         result = config.baseline(*reference)
-        arguments = cuda_args(actual, abi)
+        arguments = cuda_args(actual.values(), abi)
         torch.cuda.synchronize()
         judge.run(number, evaluate, arguments, torch.cuda.synchronize)
+        verify_guards(judge, number, guards)
         if result is not None:
             reference = result
-        if not config.check(sizes, original, actual, reference):
+        if not config.check(sizes, original, list(actual.values()), reference):
             judge.wrong(number, "XPUOJ 官方公开检查器判定不通过。")
         judge.accept(number)
     judge.finish()
 
 
 def xpu_statement_cases(problem, case, path):
-    from practice_xpuoj import baseline, case_inputs, case_numbers
+    from practice_xpuoj import baseline, case_plan
 
     python = path.endswith(".py")
     if python:
@@ -246,21 +297,19 @@ def xpu_statement_cases(problem, case, path):
         abi = read_abi(ENTRYPOINT.search(xpu_cuda_statement(problem))[0])
         evaluate = cuda_function(path, "run_kernel", abi)
     reference_impl = baseline(problem)
-    numbers = case_numbers(int(problem.key))
-    if case is not None:
-        if case not in numbers:
-            raise ValueError(f"本地用例编号为 1 到 {len(numbers)}。")
-        numbers = (case,)
-    judge = Judge(len(numbers))
-    for number in numbers:
-        torch.manual_seed(2026 + number)
-        original, outputs = case_inputs(int(problem.key), number)
-        actual = [clone(value) for value in original]
+    tests = selected_cases(case_plan(int(problem.key)), case)
+    judge = Judge(len(tests))
+    for workload in tests:
+        number = workload.number
+        original, outputs = workload.factory()
+        copies, guards = candidate_arguments(dict(enumerate(original)), workload)
+        actual = list(copies.values())
         reference = [clone(value) for value in original]
         result = reference_impl(*reference)
         arguments = actual if python else cuda_args(actual, abi)
         torch.cuda.synchronize()
         judge.run(number, evaluate, arguments, torch.cuda.synchronize)
+        verify_guards(judge, number, guards)
         if result is not None:
             reference = result
         for index, (got, want) in enumerate(zip(actual, reference)):

@@ -271,6 +271,16 @@ def run_benchmark(
     total_time_secs = end - start  # ms
     mean_time_secs = total_time_secs / iters
     out_info = f"{tag}"
+    if os.environ.get("PRACTICE_VERIFY_HGEMM") == "1":
+        reference_b = b.reshape(N, K).T if tag.startswith("tn(") else b
+        expected = a.float() @ reference_b.float()
+        difference = out.float() - expected
+        denominator = expected.norm().clamp_min(torch.finfo(torch.float32).tiny)
+        relative_l2 = (difference.norm() / denominator).item()
+        peak_relative = (difference.abs().max() / expected.abs().max().clamp_min(1e-12)).item()
+        if not (relative_l2 <= 0.02 and peak_relative <= 0.035):
+            raise AssertionError(f"{tag}: relative L2={relative_l2:g}, relative peak={peak_relative:g}")
+        print(f"CHECK {tag} relative L2={relative_l2:g}, relative peak={peak_relative:g}")
     out_flat = out.flatten()
     out_val_first = out_flat[:2].detach().cpu().numpy().tolist()
     out_val_last = out_flat[-2:].detach().cpu().numpy().tolist()

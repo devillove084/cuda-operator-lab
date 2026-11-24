@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import torch
 
 from practice_catalog import ENTRYPOINT, ROOT, local_test, solution, xpu_cuda_statement
-from practice_check import clone, cuda_args, cuda_function, load_module, read_abi, xpu_case_sizes
+from practice_check import clone, cuda_args, cuda_function, load_module, read_abi, selected_cases, xpu_public_plan
 
 
 def vector_inputs(length):
@@ -183,33 +183,31 @@ def compare_xpu(problem, args):
         else:
             positions = [index for index, role in enumerate(config.INPUT_CLASS)
                          if role in ("INOUT", "OUTPUT")]
-        total = config.getNumOfTestcases()
+        plan = selected_cases(xpu_public_plan(config), args.case)
         reference = config.baseline
+        sizes_by_case = {}
 
-        def make_inputs(number):
-            torch.manual_seed(2026 + number)
-            return config.genTestCase(xpu_case_sizes(config, number))
+        def make_inputs(workload):
+            sizes, values = workload.factory()
+            sizes_by_case[workload.number] = sizes
+            return values
 
         def validate(number, values, actual, expected):
-            sizes = xpu_case_sizes(config, number)
+            sizes = sizes_by_case[number]
             if not config.check(sizes, list(values.values()), list(actual.values()),
                                 list(expected.values())):
                 raise AssertionError(f"性能用例 {number} 未通过 XPUOJ 公开校验。")
     else:
-        from practice_xpuoj import baseline, case_inputs, case_numbers
+        from practice_xpuoj import baseline, case_plan
 
-        total = len(case_numbers(int(problem.key)))
+        plan = selected_cases(case_plan(int(problem.key)), args.case)
         reference = baseline(problem)
-        positions = case_inputs(int(problem.key), 1)[1]
+        positions = case_plan(int(problem.key))[0].factory()[1]
 
-        def make_inputs(number):
-            torch.manual_seed(2026 + number)
-            return case_inputs(int(problem.key), number)[0]
+        def make_inputs(workload):
+            return workload.factory()[0]
 
-    if args.case is not None and not 1 <= args.case <= total:
-        raise ValueError(f"XPUOJ 性能用例编号为 1 到 {total}。")
-    numbers = range(1, total + 1) if args.case is None else [args.case]
-    first = make_inputs(numbers[0])
+    first = make_inputs(plan[0])
     # Names are internal only. XPUOJ's ABI and Python reference take positional arguments.
     signature = {str(index): (None, "out" if index in positions else "in")
                  for index in range(len(first))}
@@ -218,8 +216,8 @@ def compare_xpu(problem, args):
     )
 
     def cases():
-        for number in numbers:
-            values = first if number == numbers[0] else make_inputs(number)
-            yield number, (f"XPUOJ case {number}", dict(zip(signature, values)))
+        for workload in plan:
+            values = first if workload is plan[0] else make_inputs(workload)
+            yield workload.number, (workload.label, dict(zip(signature, values)))
 
     compare(problem, challenge, solve, abi, args, cases(), validate)

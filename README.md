@@ -20,7 +20,7 @@ cd cuda-operator-lab
 ./practice.sh
 ~~~
 
-克隆完成后，列题、编辑、编译、判题和性能测试都使用本地文件。运行需要 Bash、Python 3.10+、带 CUDA 的 PyTorch、CUDA Toolkit、CMake 和 Ninja。交互菜单使用 `fzf` 和 `less`。可以直接运行命令行子命令。
+克隆完成后，列题、编辑、编译、判题和性能测试都使用本地文件。运行需要 Bash、Python 3.10+、带 CUDA 的 PyTorch、CUDA Toolkit、CMake 和 Ninja。交互菜单使用 `fzf` 和 `less`。Triton、TileLang 或 torchvision 题使用相应的 Python 依赖，性能跟踪使用 Nsight。可以直接运行命令行子命令。
 
 | 菜单按键 | 操作 |
 | --- | --- |
@@ -56,7 +56,7 @@ EDITOR=vim ./practice.sh edit leetgpu 1
 - **分析** `profile` 用 Nsight Systems 记录时间线，或用 `--tool ncu` 采集硬件计数器。报告写入 `build/practice/reports/`。
 - **进度** `Ctrl-X` 更新 `catalogs/` 内的复选框。测试和性能测量可以重复运行。
 
-LeetGPU 使用公开功能用例。XPUOJ 同时使用公开题包的校验器和依据题面编写的本地用例。LeetCUDA 清单区分逐变体判题、算子级入口和阅读条目，Hopper WGMMA 示例需要相应硬件编译和运行。用 `cases` 查看当前覆盖。
+LeetGPU 和 XPUOJ 的公开功能用例保留原编号，并追加固定种子的边界复验。复验会用 CUDA 缓冲区守卫检测越界写入。XPUOJ 的本地用例还覆盖多种形状、幅值和固定种子。LeetCUDA 的逐变体判题和共享套件分别编号。共享套件按一组实现运行，输出校验细节由套件提供。Hopper WGMMA 示例需要相应硬件编译和运行。用 `cases` 查看当前覆盖。
 
 ## 学习路线
 
