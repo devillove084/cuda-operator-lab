@@ -1,0 +1,78 @@
+<svg width="700" height="240" viewBox="0 0 700 240" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:20px auto;">
+  <rect width="700" height="240" fill="#222"/>
+
+  <!-- A matrix, split into 3 row groups -->
+  <text x="60" y="25" text-anchor="middle" fill="#ccc" font-size="13" font-family="monospace">A</text>
+  <text x="60" y="225" text-anchor="middle" fill="#888" font-size="10" font-family="monospace">M_total &#xd7; K</text>
+  <rect x="30" y="35" width="60" height="35" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="60" y="57" text-anchor="middle" fill="#cce" font-size="11" font-family="monospace">A[0:s1]</text>
+  <rect x="30" y="70" width="60" height="60" fill="#3a1a3a" stroke="#cc88ff" stroke-width="1.5"/>
+  <text x="60" y="103" text-anchor="middle" fill="#ecc" font-size="11" font-family="monospace">A[s1:s2]</text>
+  <rect x="30" y="130" width="60" height="80" fill="#3a2a1a" stroke="#ffaa44" stroke-width="1.5"/>
+  <text x="60" y="173" text-anchor="middle" fill="#ecc" font-size="11" font-family="monospace">A[s2:M]</text>
+
+  <!-- arrows to per-group products -->
+  <line x1="92" y1="52" x2="155" y2="52" stroke="#4a9eff" stroke-width="1.5" marker-end="url(#arr99)"/>
+  <line x1="92" y1="100" x2="155" y2="100" stroke="#cc88ff" stroke-width="1.5" marker-end="url(#arr99)"/>
+  <line x1="92" y1="170" x2="155" y2="170" stroke="#ffaa44" stroke-width="1.5" marker-end="url(#arr99)"/>
+
+  <!-- B[0] -->
+  <rect x="160" y="32" width="70" height="40" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="195" y="50" text-anchor="middle" fill="#cce" font-size="12" font-family="monospace">B[0]</text>
+  <text x="195" y="65" text-anchor="middle" fill="#888" font-size="10" font-family="monospace">K&#xd7;N</text>
+
+  <!-- B[1] -->
+  <rect x="160" y="80" width="70" height="40" fill="#3a1a3a" stroke="#cc88ff" stroke-width="1.5"/>
+  <text x="195" y="98" text-anchor="middle" fill="#ecc" font-size="12" font-family="monospace">B[1]</text>
+  <text x="195" y="113" text-anchor="middle" fill="#888" font-size="10" font-family="monospace">K&#xd7;N</text>
+
+  <!-- B[2] -->
+  <rect x="160" y="150" width="70" height="40" fill="#3a2a1a" stroke="#ffaa44" stroke-width="1.5"/>
+  <text x="195" y="168" text-anchor="middle" fill="#ecc" font-size="12" font-family="monospace">B[2]</text>
+  <text x="195" y="183" text-anchor="middle" fill="#888" font-size="10" font-family="monospace">K&#xd7;N</text>
+
+  <!-- multiply signs -->
+  <text x="125" y="56" text-anchor="middle" fill="#888" font-size="14" font-family="monospace">&#xD7;</text>
+  <text x="125" y="104" text-anchor="middle" fill="#888" font-size="14" font-family="monospace">&#xD7;</text>
+  <text x="125" y="174" text-anchor="middle" fill="#888" font-size="14" font-family="monospace">&#xD7;</text>
+
+  <!-- arrows to C -->
+  <line x1="232" y1="52" x2="320" y2="52" stroke="#888" stroke-width="1.5" marker-end="url(#arr99)"/>
+  <line x1="232" y1="100" x2="320" y2="100" stroke="#888" stroke-width="1.5" marker-end="url(#arr99)"/>
+  <line x1="232" y1="170" x2="320" y2="170" stroke="#888" stroke-width="1.5" marker-end="url(#arr99)"/>
+
+  <text x="276" y="44" text-anchor="middle" fill="#888" font-size="11" font-family="monospace">@</text>
+  <text x="276" y="92" text-anchor="middle" fill="#888" font-size="11" font-family="monospace">@</text>
+  <text x="276" y="162" text-anchor="middle" fill="#888" font-size="11" font-family="monospace">@</text>
+
+  <!-- C matrix -->
+  <text x="370" y="25" text-anchor="middle" fill="#ccc" font-size="13" font-family="monospace">C</text>
+  <text x="370" y="225" text-anchor="middle" fill="#888" font-size="10" font-family="monospace">M_total &#xd7; N</text>
+  <rect x="325" y="35" width="90" height="35" fill="#1a4a2a" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="370" y="57" text-anchor="middle" fill="#cce" font-size="11" font-family="monospace">C[0:s1]</text>
+  <rect x="325" y="70" width="90" height="60" fill="#1a4a2a" stroke="#cc88ff" stroke-width="1.5"/>
+  <text x="370" y="103" text-anchor="middle" fill="#ecc" font-size="11" font-family="monospace">C[s1:s2]</text>
+  <rect x="325" y="130" width="90" height="80" fill="#1a4a2a" stroke="#ffaa44" stroke-width="1.5"/>
+  <text x="370" y="173" text-anchor="middle" fill="#ecc" font-size="11" font-family="monospace">C[s2:M]</text>
+
+  <!-- group_offsets -->
+  <text x="560" y="25" text-anchor="middle" fill="#ccc" font-size="13" font-family="monospace">group_offsets</text>
+  <rect x="470" y="40" width="180" height="30" fill="#202020" stroke="#666" stroke-width="1"/>
+  <text x="490" y="60" text-anchor="middle" fill="#cce" font-size="11" font-family="monospace">0</text>
+  <text x="535" y="60" text-anchor="middle" fill="#ecc" font-size="11" font-family="monospace">s1</text>
+  <text x="585" y="60" text-anchor="middle" fill="#ecc" font-size="11" font-family="monospace">s2</text>
+  <text x="635" y="60" text-anchor="middle" fill="#fff" font-size="11" font-family="monospace">M_total</text>
+
+  <text x="560" y="100" text-anchor="middle" fill="#888" font-size="11" font-family="monospace">group g uses rows</text>
+  <text x="560" y="118" text-anchor="middle" fill="#888" font-size="11" font-family="monospace">[group_offsets[g],</text>
+  <text x="560" y="135" text-anchor="middle" fill="#888" font-size="11" font-family="monospace">group_offsets[g+1])</text>
+
+  <text x="560" y="170" text-anchor="middle" fill="#aaa" font-size="11" font-family="monospace">G = 3 here</text>
+  <text x="560" y="188" text-anchor="middle" fill="#aaa" font-size="11" font-family="monospace">(B has shape G&#xd7;K&#xd7;N)</text>
+
+  <defs>
+    <marker id="arr99" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#888"/>
+    </marker>
+  </defs>
+</svg>

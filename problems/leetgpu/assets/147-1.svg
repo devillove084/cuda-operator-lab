@@ -1,0 +1,20 @@
+<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg"
+     role="img" aria-label="4 by 4 causal attention mask: lower triangle visible, upper triangle masked">
+  <rect width="180" height="180" fill="#222" rx="8"/>
+  <rect x="10" y="10" width="40" height="40" fill="#4caf50"/>
+  <rect x="50" y="10" width="40" height="40" fill="#444"/>
+  <rect x="90" y="10" width="40" height="40" fill="#444"/>
+  <rect x="130" y="10" width="40" height="40" fill="#444"/>
+  <rect x="10" y="50" width="40" height="40" fill="#4caf50"/>
+  <rect x="50" y="50" width="40" height="40" fill="#4caf50"/>
+  <rect x="90" y="50" width="40" height="40" fill="#444"/>
+  <rect x="130" y="50" width="40" height="40" fill="#444"/>
+  <rect x="10" y="90" width="40" height="40" fill="#4caf50"/>
+  <rect x="50" y="90" width="40" height="40" fill="#4caf50"/>
+  <rect x="90" y="90" width="40" height="40" fill="#4caf50"/>
+  <rect x="130" y="90" width="40" height="40" fill="#444"/>
+  <rect x="10" y="130" width="40" height="40" fill="#4caf50"/>
+  <rect x="50" y="130" width="40" height="40" fill="#4caf50"/>
+  <rect x="90" y="130" width="40" height="40" fill="#4caf50"/>
+  <rect x="130" y="130" width="40" height="40" fill="#4caf50"/>
+</svg>

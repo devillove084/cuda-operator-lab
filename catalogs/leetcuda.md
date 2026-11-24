@@ -6,225 +6,225 @@
 
 ## Easy / Medium（120）
 
-- [ ] [elementwise_f32](../references/LeetCUDA/kernels/elementwise/elementwise.cu) · f32 · 1 星
-- [ ] [elementwise_f32x4](../references/LeetCUDA/kernels/elementwise/elementwise.cu) · f32 · 1 星
-- [ ] [elementwise_f16](../references/LeetCUDA/kernels/elementwise/elementwise.cu) · f16 · 1 星
-- [ ] [elementwise_f16x2](../references/LeetCUDA/kernels/elementwise/elementwise.cu) · f16 · 1 星
-- [ ] [elementwise_f16x8](../references/LeetCUDA/kernels/elementwise/elementwise.cu) · f16 · 1 星
-- [ ] [elementwise_f16x8_pack](../references/LeetCUDA/kernels/elementwise/elementwise.cu) · f16 · 2 星
-- [ ] [histogram_i32](../references/LeetCUDA/kernels/histogram/histogram.cu) · i32 · 1 星
-- [ ] [histogram_i32x4](../references/LeetCUDA/kernels/histogram/histogram.cu) · i32 · 1 星
-- [ ] [sigmoid_f32](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu) · f32 · 1 星
-- [ ] [sigmoid_f32x4](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu) · f32 · 1 星
-- [ ] [sigmoid_f16](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu) · 16 · 1 星
-- [ ] [sigmoid_f16x2](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu) · f16 · 1 星
-- [ ] [sigmoid_f16x8](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu) · f16 · 1 星
-- [ ] [sigmoid_f16x8_pack](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu) · f16 · 2 星
-- [ ] [relu_f32](../references/LeetCUDA/kernels/relu/relu.cu) · f32 · 1 星
-- [ ] [relu_f32x4](../references/LeetCUDA/kernels/relu/relu.cu) · f32 · 1 星
-- [ ] [relu_f16](../references/LeetCUDA/kernels/relu/relu.cu) · f16 · 1 星
-- [ ] [relu_f16x2](../references/LeetCUDA/kernels/relu/relu.cu) · f16 · 1 星
-- [ ] [relu_f16x8](../references/LeetCUDA/kernels/relu/relu.cu) · f16 · 1 星
-- [ ] [relu_f16x8_pack](../references/LeetCUDA/kernels/relu/relu.cu) · f16 · 2 星
-- [ ] [elu_f32](../references/LeetCUDA/kernels/elu/elu.cu) · f32 · 1 星
-- [ ] [elu_f32x4](../references/LeetCUDA/kernels/elu/elu.cu) · f32 · 1 星
-- [ ] [elu_f16](../references/LeetCUDA/kernels/elu/elu.cu) · f16 · 1 星
-- [ ] [elu_f16x2](../references/LeetCUDA/kernels/elu/elu.cu) · f16 · 1 星
-- [ ] [elu_f16x8](../references/LeetCUDA/kernels/elu/elu.cu) · f16 · 1 星
-- [ ] [elu_f16x8_pack](../references/LeetCUDA/kernels/elu/elu.cu) · f16 · 2 星
-- [ ] [gelu_f32](../references/LeetCUDA/kernels/gelu/gelu.cu) · f32 · 1 星
-- [ ] [gelu_f32x4](../references/LeetCUDA/kernels/gelu/gelu.cu) · f32 · 1 星
-- [ ] [gelu_f16](../references/LeetCUDA/kernels/gelu/gelu.cu) · f16 · 1 星
-- [ ] [gelu_f16x2](../references/LeetCUDA/kernels/gelu/gelu.cu) · f16 · 1 星
-- [ ] [gelu_f16x8](../references/LeetCUDA/kernels/gelu/gelu.cu) · f16 · 1 星
-- [ ] [gelu_f16x8_pack](../references/LeetCUDA/kernels/gelu/gelu.cu) · f16 · 2 星
-- [ ] [swish_f32](../references/LeetCUDA/kernels/swish/swish.cu) · f32 · 1 星
-- [ ] [swish_f32x4](../references/LeetCUDA/kernels/swish/swish.cu) · f32 · 1 星
-- [ ] [swish_f16](../references/LeetCUDA/kernels/swish/swish.cu) · f16 · 1 星
-- [ ] [swish_f16x2](../references/LeetCUDA/kernels/swish/swish.cu) · f16 · 1 星
-- [ ] [swish_f16x8](../references/LeetCUDA/kernels/swish/swish.cu) · f16 · 1 星
-- [ ] [swish_f16x8_pack](../references/LeetCUDA/kernels/swish/swish.cu) · f16 · 2 星
-- [ ] [hardswish_f32](../references/LeetCUDA/kernels/hardswish/hardswish.cu) · f32 · 1 星
-- [ ] [hardswish_f32x4](../references/LeetCUDA/kernels/hardswish/hardswish.cu) · f32 · 1 星
-- [ ] [hardswish_f16](../references/LeetCUDA/kernels/hardswish/hardswish.cu) · f16 · 1 星
-- [ ] [hardswish_f16x2](../references/LeetCUDA/kernels/hardswish/hardswish.cu) · f16 · 1 星
-- [ ] [hardswish_f16x8](../references/LeetCUDA/kernels/hardswish/hardswish.cu) · f16 · 1 星
-- [ ] [hardswish_f16x8_pack](../references/LeetCUDA/kernels/hardswish/hardswish.cu) · f16 · 2 星
-- [ ] [hardshrink_f32](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu) · f32 · 1 星
-- [ ] [hardshrink_f32x4](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu) · f32 · 1 星
-- [ ] [hardshrink_f16](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu) · f16 · 1 星
-- [ ] [hardshrink_f16x2](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu) · f16 · 1 星
-- [ ] [hardshrink_f16x8](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu) · f16 · 1 星
-- [ ] [hardshrink_f16x8_pack](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu) · f16 · 2 星
-- [ ] [embedding_f32](../references/LeetCUDA/kernels/embedding/embedding.cu) · f32 · 1 星
-- [ ] [embedding_f32x4](../references/LeetCUDA/kernels/embedding/embedding.cu) · f32 · 1 星
-- [ ] [embedding_f32x4_pack](../references/LeetCUDA/kernels/embedding/embedding.cu) · f32 · 1 星
-- [ ] [embedding_f16](../references/LeetCUDA/kernels/embedding/embedding.cu) · f16 · 1 星
-- [ ] [embedding_f16x2](../references/LeetCUDA/kernels/embedding/embedding.cu) · f16 · 1 星
-- [ ] [embedding_f16x8](../references/LeetCUDA/kernels/embedding/embedding.cu) · f16 · 1 星
-- [ ] [embedding_f16x8_pack](../references/LeetCUDA/kernels/embedding/embedding.cu) · f16 · 2 星
-- [ ] [mat_trans_f32_col2row{2d}](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu) · f32 · 1 星
-- [ ] [mat_trans_f32_row2col{2d}](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu) · f32 · 1 星
-- [ ] [mat_trans_f32_diagonal2d](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu) · f32 · 2 星
-- [ ] [mat_trans_f32x4_col2row{2d}](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu) · f32 · 2 星
-- [ ] [mat_trans_f32x4_row2col{2d}](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu) · f32 · 2 星
-- [ ] [mat_trans_cute](../references/LeetCUDA/kernels/mat-transpose/mat_transpose_cute.cu) · f32 · 2 星
-- [ ] [warp_reduce_{all}](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · all → all · 2 星
-- [ ] [block_all_reduce_f32_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f32 → f32 · 2 星
-- [ ] [block_all_reduce_f32x4_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f32 → f32 · 2 星
-- [ ] [block_all_reduce_f16_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f16 → f16 · 2 星
-- [ ] [block_all_reduce_f16_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f16 → f32 · 2 星
-- [ ] [block_all_reduce_f16x2_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f16 → f16 · 2 星
-- [ ] [block_all_reduce_f16x2_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f16 → f32 · 2 星
-- [ ] [block_all_reduce_f16x8_pack_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f16 → f16 · 2 星
-- [ ] [block_all_reduce_f16x8_pack_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · f16 → f32 · 2 星
-- [ ] [block_all_reduce_bf16_bf16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · bf16 → bf16 · 2 星
-- [ ] [block_all_reduce_bf16_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · bf16 → f32 · 2 星
-- [ ] [block_all_reduce_bf16x2_bf16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · bf16 → bf16 · 2 星
-- [ ] [block_all_reduce_bf16x2_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · bf16 → f32 · 2 星
-- [ ] [block_all_reduce_bf16x8_pack_bf16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · bf16 → bf16 · 2 星
-- [ ] [block_all_reduce_bf16x8_pack_f32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · bf16 → f32 · 2 星
-- [ ] [block_all_reduce_fp8_e4m3_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · fp8_e4m3 → f16 · 3 星
-- [ ] [block_all_reduce_fp8_e5m2_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · fp8_e5m2 → f16 · 3 星
-- [ ] [block_all_reduce_fp8_e4m3x16_pack_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · fp8_e4m3 → f16 · 3 星
-- [ ] [block_all_reduce_fp8_e5m2x16_pack_f16](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · fp8_e5m2 → f16 · 3 星
-- [ ] [block_all_reduce_i8_i32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · i8 → i32 · 2 星
-- [ ] [block_all_reduce_i8x16_pack_i32](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu) · i8 → i32 · 2 星
-- [ ] [dot_product_f32](../references/LeetCUDA/kernels/dot-product/dot_product.cu) · f32 → f32 · 2 星
-- [ ] [dot_product_f32x4](../references/LeetCUDA/kernels/dot-product/dot_product.cu) · f32 → f32 · 2 星
-- [ ] [dot_product_f16_f32](../references/LeetCUDA/kernels/dot-product/dot_product.cu) · f16 → f32 · 2 星
-- [ ] [dot_product_f16x2_f32](../references/LeetCUDA/kernels/dot-product/dot_product.cu) · f16 → f32 · 2 星
-- [ ] [dot_product_f16x8_pack_f32](../references/LeetCUDA/kernels/dot-product/dot_product.cu) · f16 → f32 · 2 星
-- [ ] [softmax_f32_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f32 → f32 · 2 星
-- [ ] [softmax_f32x4_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f32 → f32 · 2 星
-- [ ] [safe_softmax_f32_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f32 → f32 · 2 星
-- [ ] [safe_softmax_f32x4_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f32 → f32 · 2 星
-- [ ] [safe_softmax_f16_f32_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f16 → f32 · 2 星
-- [ ] [safe_softmax_f16x2_f32_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f16 → f32 · 2 星
-- [ ] [safe_softmax_f16x8_pack_f32_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f16 → f32 · 2 星
-- [ ] [online_safe_softmax_f32_per_token](../references/LeetCUDA/kernels/softmax/softmax.cu) · f32 → f32 · 2 星
-- [ ] [online_safe_softmax_f32x4_pack_per_tok](../references/LeetCUDA/kernels/softmax/softmax.cu) · f32 → f32 · 2 星
-- [ ] [rope_f32](../references/LeetCUDA/kernels/rope/rope.cu) · f32 → f32 · 2 星
-- [ ] [rope_f32x4_pack](../references/LeetCUDA/kernels/rope/rope.cu) · f32 → f32 · 2 星
-- [ ] [layer_norm_f32](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f32 → f32 · 2 星
-- [ ] [layer_norm_f32x4](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f32 → f32 · 2 星
-- [ ] [layer_norm_f16_f16](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f16 → f16 · 2 星
-- [ ] [layer_norm_f16x2_f16](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f16 → f16 · 2 星
-- [ ] [layer_norm_f16x8_f16](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f16 → f16 · 2 星
-- [ ] [layer_norm_f16x8_pack_f16](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f16 → f16 · 2 星
-- [ ] [layer_norm_f16x8_pack_f32](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f16 → f32 · 2 星
-- [ ] [layer_norm_f16_f32](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu) · f16 → f32 · 2 星
-- [ ] [rms_norm_f32](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f32 → f32 · 2 星
-- [ ] [rms_norm_f32x4](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f32 → f32 · 2 星
-- [ ] [rms_norm_f16_f16](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f16 · 2 星
-- [ ] [rms_norm_f16x2_f16](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f16 · 2 星
-- [ ] [rms_norm_f16x8_f16](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f16 · 2 星
-- [ ] [rms_norm_f16x8_f32](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f32 · 2 星
-- [ ] [rms_norm_f16x8_pack_f16](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f16 · 2 星
-- [ ] [rms_norm_f16x8_pack_f32](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f32 · 2 星
-- [ ] [rms_norm_f16_f32](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu) · f16 → f32 · 2 星
-- [ ] [nms_f32](../references/LeetCUDA/kernels/nms/nms.cu) · f32 · 2 星
-- [ ] [merge_attn_states](../references/LeetCUDA/kernels/openai-triton/merge-attn-states/cuda_merge_attn_states.cu) · f16/bf16/f32 → f32 · 2 星
-- [ ] [How to use nsys/ncu(timeline/ptx/sass)](../references/LeetCUDA/kernels/nvidia-nsight/) · / · 2 星
+- [ ] [elementwise_f32](../problems/leetcuda/1.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elementwise/elementwise.cu)
+- [ ] [elementwise_f32x4](../problems/leetcuda/2.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elementwise/elementwise.cu)
+- [ ] [elementwise_f16](../problems/leetcuda/3.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elementwise/elementwise.cu)
+- [ ] [elementwise_f16x2](../problems/leetcuda/4.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elementwise/elementwise.cu)
+- [ ] [elementwise_f16x8](../problems/leetcuda/5.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elementwise/elementwise.cu)
+- [ ] [elementwise_f16x8_pack](../problems/leetcuda/6.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/elementwise/elementwise.cu)
+- [ ] [histogram_i32](../problems/leetcuda/7.md) · i32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/histogram/histogram.cu)
+- [ ] [histogram_i32x4](../problems/leetcuda/8.md) · i32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/histogram/histogram.cu)
+- [ ] [sigmoid_f32](../problems/leetcuda/9.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu)
+- [ ] [sigmoid_f32x4](../problems/leetcuda/10.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu)
+- [ ] [sigmoid_f16](../problems/leetcuda/11.md) · 16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu)
+- [ ] [sigmoid_f16x2](../problems/leetcuda/12.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu)
+- [ ] [sigmoid_f16x8](../problems/leetcuda/13.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu)
+- [ ] [sigmoid_f16x8_pack](../problems/leetcuda/14.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/sigmoid/sigmoid.cu)
+- [ ] [relu_f32](../problems/leetcuda/15.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/relu/relu.cu)
+- [ ] [relu_f32x4](../problems/leetcuda/16.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/relu/relu.cu)
+- [ ] [relu_f16](../problems/leetcuda/17.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/relu/relu.cu)
+- [ ] [relu_f16x2](../problems/leetcuda/18.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/relu/relu.cu)
+- [ ] [relu_f16x8](../problems/leetcuda/19.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/relu/relu.cu)
+- [ ] [relu_f16x8_pack](../problems/leetcuda/20.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/relu/relu.cu)
+- [ ] [elu_f32](../problems/leetcuda/21.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elu/elu.cu)
+- [ ] [elu_f32x4](../problems/leetcuda/22.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elu/elu.cu)
+- [ ] [elu_f16](../problems/leetcuda/23.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elu/elu.cu)
+- [ ] [elu_f16x2](../problems/leetcuda/24.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elu/elu.cu)
+- [ ] [elu_f16x8](../problems/leetcuda/25.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/elu/elu.cu)
+- [ ] [elu_f16x8_pack](../problems/leetcuda/26.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/elu/elu.cu)
+- [ ] [gelu_f32](../problems/leetcuda/27.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/gelu/gelu.cu)
+- [ ] [gelu_f32x4](../problems/leetcuda/28.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/gelu/gelu.cu)
+- [ ] [gelu_f16](../problems/leetcuda/29.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/gelu/gelu.cu)
+- [ ] [gelu_f16x2](../problems/leetcuda/30.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/gelu/gelu.cu)
+- [ ] [gelu_f16x8](../problems/leetcuda/31.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/gelu/gelu.cu)
+- [ ] [gelu_f16x8_pack](../problems/leetcuda/32.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/gelu/gelu.cu)
+- [ ] [swish_f32](../problems/leetcuda/33.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/swish/swish.cu)
+- [ ] [swish_f32x4](../problems/leetcuda/34.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/swish/swish.cu)
+- [ ] [swish_f16](../problems/leetcuda/35.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/swish/swish.cu)
+- [ ] [swish_f16x2](../problems/leetcuda/36.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/swish/swish.cu)
+- [ ] [swish_f16x8](../problems/leetcuda/37.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/swish/swish.cu)
+- [ ] [swish_f16x8_pack](../problems/leetcuda/38.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/swish/swish.cu)
+- [ ] [hardswish_f32](../problems/leetcuda/39.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardswish/hardswish.cu)
+- [ ] [hardswish_f32x4](../problems/leetcuda/40.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardswish/hardswish.cu)
+- [ ] [hardswish_f16](../problems/leetcuda/41.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardswish/hardswish.cu)
+- [ ] [hardswish_f16x2](../problems/leetcuda/42.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardswish/hardswish.cu)
+- [ ] [hardswish_f16x8](../problems/leetcuda/43.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardswish/hardswish.cu)
+- [ ] [hardswish_f16x8_pack](../problems/leetcuda/44.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/hardswish/hardswish.cu)
+- [ ] [hardshrink_f32](../problems/leetcuda/45.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu)
+- [ ] [hardshrink_f32x4](../problems/leetcuda/46.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu)
+- [ ] [hardshrink_f16](../problems/leetcuda/47.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu)
+- [ ] [hardshrink_f16x2](../problems/leetcuda/48.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu)
+- [ ] [hardshrink_f16x8](../problems/leetcuda/49.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu)
+- [ ] [hardshrink_f16x8_pack](../problems/leetcuda/50.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/hardshrink/hardshrink.cu)
+- [ ] [embedding_f32](../problems/leetcuda/51.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [embedding_f32x4](../problems/leetcuda/52.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [embedding_f32x4_pack](../problems/leetcuda/53.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [embedding_f16](../problems/leetcuda/54.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [embedding_f16x2](../problems/leetcuda/55.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [embedding_f16x8](../problems/leetcuda/56.md) · f16 · 1 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [embedding_f16x8_pack](../problems/leetcuda/57.md) · f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/embedding/embedding.cu)
+- [ ] [mat_trans_f32_col2row{2d}](../problems/leetcuda/58.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu)
+- [ ] [mat_trans_f32_row2col{2d}](../problems/leetcuda/59.md) · f32 · 1 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu)
+- [ ] [mat_trans_f32_diagonal2d](../problems/leetcuda/60.md) · f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu)
+- [ ] [mat_trans_f32x4_col2row{2d}](../problems/leetcuda/61.md) · f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu)
+- [ ] [mat_trans_f32x4_row2col{2d}](../problems/leetcuda/62.md) · f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose.cu)
+- [ ] [mat_trans_cute](../problems/leetcuda/63.md) · f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose_cute.cu)
+- [ ] [warp_reduce_{all}](../problems/leetcuda/64.md) · all → all · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f32_f32](../problems/leetcuda/65.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f32x4_f32](../problems/leetcuda/66.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f16_f16](../problems/leetcuda/67.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f16_f32](../problems/leetcuda/68.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f16x2_f16](../problems/leetcuda/69.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f16x2_f32](../problems/leetcuda/70.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f16x8_pack_f16](../problems/leetcuda/71.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_f16x8_pack_f32](../problems/leetcuda/72.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_bf16_bf16](../problems/leetcuda/73.md) · bf16 → bf16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_bf16_f32](../problems/leetcuda/74.md) · bf16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_bf16x2_bf16](../problems/leetcuda/75.md) · bf16 → bf16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_bf16x2_f32](../problems/leetcuda/76.md) · bf16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_bf16x8_pack_bf16](../problems/leetcuda/77.md) · bf16 → bf16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_bf16x8_pack_f32](../problems/leetcuda/78.md) · bf16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_fp8_e4m3_f16](../problems/leetcuda/79.md) · fp8_e4m3 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_fp8_e5m2_f16](../problems/leetcuda/80.md) · fp8_e5m2 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_fp8_e4m3x16_pack_f16](../problems/leetcuda/81.md) · fp8_e4m3 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_fp8_e5m2x16_pack_f16](../problems/leetcuda/82.md) · fp8_e5m2 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_i8_i32](../problems/leetcuda/83.md) · i8 → i32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [block_all_reduce_i8x16_pack_i32](../problems/leetcuda/84.md) · i8 → i32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/reduce/block_all_reduce.cu)
+- [ ] [dot_product_f32](../problems/leetcuda/85.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/dot-product/dot_product.cu)
+- [ ] [dot_product_f32x4](../problems/leetcuda/86.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/dot-product/dot_product.cu)
+- [ ] [dot_product_f16_f32](../problems/leetcuda/87.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/dot-product/dot_product.cu)
+- [ ] [dot_product_f16x2_f32](../problems/leetcuda/88.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/dot-product/dot_product.cu)
+- [ ] [dot_product_f16x8_pack_f32](../problems/leetcuda/89.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/dot-product/dot_product.cu)
+- [ ] [softmax_f32_per_tok](../problems/leetcuda/90.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [softmax_f32x4_per_tok](../problems/leetcuda/91.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [safe_softmax_f32_per_tok](../problems/leetcuda/92.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [safe_softmax_f32x4_per_tok](../problems/leetcuda/93.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [safe_softmax_f16_f32_per_tok](../problems/leetcuda/94.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [safe_softmax_f16x2_f32_per_tok](../problems/leetcuda/95.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [safe_softmax_f16x8_pack_f32_per_tok](../problems/leetcuda/96.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [online_safe_softmax_f32_per_token](../problems/leetcuda/97.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [online_safe_softmax_f32x4_pack_per_tok](../problems/leetcuda/98.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/softmax/softmax.cu)
+- [ ] [rope_f32](../problems/leetcuda/99.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rope/rope.cu)
+- [ ] [rope_f32x4_pack](../problems/leetcuda/100.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rope/rope.cu)
+- [ ] [layer_norm_f32](../problems/leetcuda/101.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f32x4](../problems/leetcuda/102.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f16_f16](../problems/leetcuda/103.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f16x2_f16](../problems/leetcuda/104.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f16x8_f16](../problems/leetcuda/105.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f16x8_pack_f16](../problems/leetcuda/106.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f16x8_pack_f32](../problems/leetcuda/107.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [layer_norm_f16_f32](../problems/leetcuda/108.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/layer-norm/layer_norm.cu)
+- [ ] [rms_norm_f32](../problems/leetcuda/109.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f32x4](../problems/leetcuda/110.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16_f16](../problems/leetcuda/111.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16x2_f16](../problems/leetcuda/112.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16x8_f16](../problems/leetcuda/113.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16x8_f32](../problems/leetcuda/114.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16x8_pack_f16](../problems/leetcuda/115.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16x8_pack_f32](../problems/leetcuda/116.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [rms_norm_f16_f32](../problems/leetcuda/117.md) · f16 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/rms-norm/rms_norm.cu)
+- [ ] [nms_f32](../problems/leetcuda/118.md) · f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/nms/nms.cu)
+- [ ] [merge_attn_states](../problems/leetcuda/119.md) · f16/bf16/f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/openai-triton/merge-attn-states/cuda_merge_attn_states.cu)
+- [ ] [How to use nsys/ncu(timeline/ptx/sass)](../problems/leetcuda/120.md) · / · 2 星 · [原始材料](../references/LeetCUDA/kernels/nvidia-nsight/)
 
 ## Hard（40）
 
-- [ ] [sgemv_k32_f32](../references/LeetCUDA/kernels/sgemv/sgemv.cu) · f32 → f32 · 3 星
-- [ ] [sgemv_k128_f32x4](../references/LeetCUDA/kernels/sgemv/sgemv.cu) · f32 → f32 · 3 星
-- [ ] [sgemv_k16_f32](../references/LeetCUDA/kernels/sgemv/sgemv.cu) · f32 → f32 · 3 星
-- [ ] [hgemv_k32_f16](../references/LeetCUDA/kernels/hgemv/hgemv.cu) · f16 → f16 · 3 星
-- [ ] [hgemv_k128_f16x4](../references/LeetCUDA/kernels/hgemv/hgemv.cu) · f16 → f16 · 3 星
-- [ ] [hgemv_k16_f16](../references/LeetCUDA/kernels/hgemv/hgemv.cu) · f16 → f16 · 3 星
-- [ ] [sgemm_naive_f32](../references/LeetCUDA/kernels/sgemm/sgemm.cu) · f32 → f32 · 2 星
-- [ ] [sgemm_sliced_k_f32](../references/LeetCUDA/kernels/sgemm/sgemm.cu) · f32 → f32 · 3 星
-- [ ] [sgemm_t_8x8_sliced_k_f32x4](../references/LeetCUDA/kernels/sgemm/sgemm.cu) · f32 → f32 · 3 星
-- [ ] [sgemm_t_8x8_sliced_k...bcf](../references/LeetCUDA/kernels/sgemm/sgemm.cu) · f32 → f32 · 3 星
-- [ ] [sgemm_t_8x8_sliced_k...dbuf](../references/LeetCUDA/kernels/sgemm/sgemm.cu) · f32 → f32 · 3 星
-- [ ] [sgemm_t_8x8_sliced_k16...dbuf](../references/LeetCUDA/kernels/sgemm/sgemm_async.cu) · f32 → f32 · 3 星
-- [ ] [sgemm_t_8x8_sliced_k16...async](../references/LeetCUDA/kernels/sgemm/sgemm_async.cu) · f32 → f32 · 3 星
-- [ ] [sgemm_wmma_m16n16k8...stages*](../references/LeetCUDA/kernels/sgemm/sgemm_wmma_tf32_stage.cu) · tf32 → f32 · 3 星
-- [ ] [sgemm_wmma_m16n16k8...swizzle*](../references/LeetCUDA/kernels/sgemm/sgemm_wmma_tf32_stage.cu) · tf32 → f32 · 3 星
-- [ ] [hgemm_naive_f16](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu) · f16 → f16 · 2 星
-- [ ] [hgemm_sliced_k_f16](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_t_8x8_sliced_k_f16x4](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_t_8x8_sliced_k_f16x4_pack](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_t_8x8_sliced_k_f16x8_pack](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_t_8x8_sliced_k...dbuf](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_t_8/16x8...k16/32...dbuf](../references/LeetCUDA/kernels/hgemm/naive/hgemm_async.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_t_8/16x8...k16/32...async](../references/LeetCUDA/kernels/hgemm/naive/hgemm_async.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m16n16k16...naive*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m16n16k16...mma4x2*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m16n16k16...mma4x4*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m16n16k16...dbuf*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m32n8k16....dbuf*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m16n16k16...stages*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma_stage.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wmma_m16n16k16...swizzle*](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma_stage.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_m16n8k16...naive*](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_m16n8k16...mma2x4*](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_m16n8k16...stages*](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma_stage.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_m16n8k16...swizzle*](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma_stage.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_m16n8k16...swizzle{smem}*](../references/LeetCUDA/kernels/hgemm/mma/swizzle/hgemm_mma_stage_swizzle.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_m16n8k16...swizzle{tn}{smem}*](../references/LeetCUDA/kernels/hgemm/mma/swizzle/hgemm_mma_stage_tn_swizzle_x4.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_stages_swizzle{smem}...cute*](../references/LeetCUDA/kernels/hgemm/cutlass/hgemm_mma_stage_tn_cute.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_cublas*](../references/LeetCUDA/kernels/hgemm/cublas/hgemm_cublas.cu) · f16 → f16 · 2 星
-- [ ] [hgemm_wgmma_m64n128k16...tma{ws}{tn}*](../references/LeetCUDA/kernels/hgemm/wgmma/hgemm_wgmma_fp16acc_stages_tn.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_wgmma_m64n128k16_fp32...tma*](../references/LeetCUDA/kernels/hgemm/wgmma/hgemm_wgmma_fp32acc_stages_tn.cu) · f16 → f32 · 3 星
+- [ ] [sgemv_k32_f32](../problems/leetcuda/121.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemv/sgemv.cu)
+- [ ] [sgemv_k128_f32x4](../problems/leetcuda/122.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemv/sgemv.cu)
+- [ ] [sgemv_k16_f32](../problems/leetcuda/123.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemv/sgemv.cu)
+- [ ] [hgemv_k32_f16](../problems/leetcuda/124.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemv/hgemv.cu)
+- [ ] [hgemv_k128_f16x4](../problems/leetcuda/125.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemv/hgemv.cu)
+- [ ] [hgemv_k16_f16](../problems/leetcuda/126.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemv/hgemv.cu)
+- [ ] [sgemm_naive_f32](../problems/leetcuda/127.md) · f32 → f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm.cu)
+- [ ] [sgemm_sliced_k_f32](../problems/leetcuda/128.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm.cu)
+- [ ] [sgemm_t_8x8_sliced_k_f32x4](../problems/leetcuda/129.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm.cu)
+- [ ] [sgemm_t_8x8_sliced_k...bcf](../problems/leetcuda/130.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm.cu)
+- [ ] [sgemm_t_8x8_sliced_k...dbuf](../problems/leetcuda/131.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm.cu)
+- [ ] [sgemm_t_8x8_sliced_k16...dbuf](../problems/leetcuda/132.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm_async.cu)
+- [ ] [sgemm_t_8x8_sliced_k16...async](../problems/leetcuda/133.md) · f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm_async.cu)
+- [ ] [sgemm_wmma_m16n16k8...stages*](../problems/leetcuda/134.md) · tf32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm_wmma_tf32_stage.cu)
+- [ ] [sgemm_wmma_m16n16k8...swizzle*](../problems/leetcuda/135.md) · tf32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/sgemm/sgemm_wmma_tf32_stage.cu)
+- [ ] [hgemm_naive_f16](../problems/leetcuda/136.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu)
+- [ ] [hgemm_sliced_k_f16](../problems/leetcuda/137.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu)
+- [ ] [hgemm_t_8x8_sliced_k_f16x4](../problems/leetcuda/138.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu)
+- [ ] [hgemm_t_8x8_sliced_k_f16x4_pack](../problems/leetcuda/139.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu)
+- [ ] [hgemm_t_8x8_sliced_k_f16x8_pack](../problems/leetcuda/140.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu)
+- [ ] [hgemm_t_8x8_sliced_k...dbuf](../problems/leetcuda/141.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm.cu)
+- [ ] [hgemm_t_8/16x8...k16/32...dbuf](../problems/leetcuda/142.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm_async.cu)
+- [ ] [hgemm_t_8/16x8...k16/32...async](../problems/leetcuda/143.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/naive/hgemm_async.cu)
+- [ ] [hgemm_wmma_m16n16k16...naive*](../problems/leetcuda/144.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu)
+- [ ] [hgemm_wmma_m16n16k16...mma4x2*](../problems/leetcuda/145.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu)
+- [ ] [hgemm_wmma_m16n16k16...mma4x4*](../problems/leetcuda/146.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu)
+- [ ] [hgemm_wmma_m16n16k16...dbuf*](../problems/leetcuda/147.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu)
+- [ ] [hgemm_wmma_m32n8k16....dbuf*](../problems/leetcuda/148.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma.cu)
+- [ ] [hgemm_wmma_m16n16k16...stages*](../problems/leetcuda/149.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma_stage.cu)
+- [ ] [hgemm_wmma_m16n16k16...swizzle*](../problems/leetcuda/150.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wmma/hgemm_wmma_stage.cu)
+- [ ] [hgemm_mma_m16n8k16...naive*](../problems/leetcuda/151.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma.cu)
+- [ ] [hgemm_mma_m16n8k16...mma2x4*](../problems/leetcuda/152.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma.cu)
+- [ ] [hgemm_mma_m16n8k16...stages*](../problems/leetcuda/153.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma_stage.cu)
+- [ ] [hgemm_mma_m16n8k16...swizzle*](../problems/leetcuda/154.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/mma/basic/hgemm_mma_stage.cu)
+- [ ] [hgemm_mma_m16n8k16...swizzle{smem}*](../problems/leetcuda/155.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/mma/swizzle/hgemm_mma_stage_swizzle.cu)
+- [ ] [hgemm_mma_m16n8k16...swizzle{tn}{smem}*](../problems/leetcuda/156.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/mma/swizzle/hgemm_mma_stage_tn_swizzle_x4.cu)
+- [ ] [hgemm_mma_stages_swizzle{smem}...cute*](../problems/leetcuda/157.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/cutlass/hgemm_mma_stage_tn_cute.cu)
+- [ ] [hgemm_mma_cublas*](../problems/leetcuda/158.md) · f16 → f16 · 2 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/cublas/hgemm_cublas.cu)
+- [ ] [hgemm_wgmma_m64n128k16...tma{ws}{tn}*](../problems/leetcuda/159.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wgmma/hgemm_wgmma_fp16acc_stages_tn.cu)
+- [ ] [hgemm_wgmma_m64n128k16_fp32...tma*](../problems/leetcuda/160.md) · f16 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/wgmma/hgemm_wgmma_fp32acc_stages_tn.cu)
 
 ## Hard+ / Hard++（35）
 
-- [ ] [flash_attn_cute(naive)](../references/LeetCUDA/kernels/flash-attn/cutlass/flash_attn_cute.cu) · f16 → f32 · 3 星
-- [ ] [How to implement MMA smem swizzle*](../references/LeetCUDA/kernels/swizzle/mma_simple_swizzle.cu) · f16 → f16 · 3 星
-- [ ] [flash_attn_mma_stages_split_kv*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_split_kv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma_stages_split_q*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_split_q.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma_stages...shared_kv*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_kv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma_stages...shared_qkv*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_qkv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma_stages...tiling_qk*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qk.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma_stages...tiling_qkv*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qkv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma_stages...shared_kv{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_kv_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn_mma_stages...shared_qkv{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_qkv_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn_mma_stages...tiling_qk{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qk_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn_mma_stages...tiling_qkv{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qkv_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn_mma...shared_kv{f32}{rr}*](../references/LeetCUDA/kernels/flash-attn/mma/others/flash_attn_mma_share_kv_F32F16F16F32_rr.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn_mma...shared_qkv{f32}{rr}*](../references/LeetCUDA/kernels/flash-attn/mma/others/flash_attn_mma_share_qkv_F32F16F16F32_rr.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn_mma...shared_kv_swizzle{q}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_kv_swizzle_q.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...shared_kv_swizzle{qk}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_kv_swizzle_qk.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...shared_kv_swizzle{qkv}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_kv_swizzle_qkv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...shared_qkv_swizzle{q}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_qkv_swizzle_q.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...shared_qkv_swizzle{qk}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_qkv_swizzle_qk.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...shared_qkv_swizzle{qkv}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_qkv_swizzle_qkv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...tiling_qk_swizzle{q}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qk_swizzle_q.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...tiling_qk_swizzle{qk}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qk_swizzle_qk.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...tiling_qk_swizzle{qkv}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qk_swizzle_qkv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...tiling_qkv_swizzle{q}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_q.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...tiling_qkv_swizzle{qk}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qk.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn_mma...tiling_qkv_swizzle{qkv}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qkv.cu) · f16 → f16 · 4 星
-- [ ] [flash_attn...tiling_qkv_swizzle{q}{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_q_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn...tiling_qkv_swizzle{qk}{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qk_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [flash_attn...tiling_qkv_swizzle{qkv}{f32}*](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qkv_F32F16F16F32.cu) · f16 → f32 · 4 星
-- [ ] [ffpa_attn_split_d_fwd_template](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh) · f16 → f16 · 4 星
-- [ ] [ffpa_attn_split_d_fwd_template](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh) · f16 → f32 · 4 星
-- [ ] [ffpa_attn_splitkv_decode_stage1_template](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh) · f16 → f32 · 4 星
-- [ ] [ffpa_attn_splitkv_decode_stage2_template](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh) · f16 → f32 · 4 星
-- [ ] [ffpa_attn_persistent_d_fwd_template](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh) · f16 → f16 · 4 星
-- [ ] [ffpa_attn_persistent_d_fwd_template](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh) · f16 → f32 · 4 星
+- [ ] [flash_attn_cute(naive)](../problems/leetcuda/161.md) · f16 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/cutlass/flash_attn_cute.cu)
+- [ ] [How to implement MMA smem swizzle*](../problems/leetcuda/162.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/swizzle/mma_simple_swizzle.cu)
+- [ ] [flash_attn_mma_stages_split_kv*](../problems/leetcuda/163.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_split_kv.cu)
+- [ ] [flash_attn_mma_stages_split_q*](../problems/leetcuda/164.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_split_q.cu)
+- [ ] [flash_attn_mma_stages...shared_kv*](../problems/leetcuda/165.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_kv.cu)
+- [ ] [flash_attn_mma_stages...shared_qkv*](../problems/leetcuda/166.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_qkv.cu)
+- [ ] [flash_attn_mma_stages...tiling_qk*](../problems/leetcuda/167.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qk.cu)
+- [ ] [flash_attn_mma_stages...tiling_qkv*](../problems/leetcuda/168.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qkv.cu)
+- [ ] [flash_attn_mma_stages...shared_kv{f32}*](../problems/leetcuda/169.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_kv_F32F16F16F32.cu)
+- [ ] [flash_attn_mma_stages...shared_qkv{f32}*](../problems/leetcuda/170.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_share_qkv_F32F16F16F32.cu)
+- [ ] [flash_attn_mma_stages...tiling_qk{f32}*](../problems/leetcuda/171.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qk_F32F16F16F32.cu)
+- [ ] [flash_attn_mma_stages...tiling_qkv{f32}*](../problems/leetcuda/172.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/basic/flash_attn_mma_tiling_qkv_F32F16F16F32.cu)
+- [ ] [flash_attn_mma...shared_kv{f32}{rr}*](../problems/leetcuda/173.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/others/flash_attn_mma_share_kv_F32F16F16F32_rr.cu)
+- [ ] [flash_attn_mma...shared_qkv{f32}{rr}*](../problems/leetcuda/174.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/others/flash_attn_mma_share_qkv_F32F16F16F32_rr.cu)
+- [ ] [flash_attn_mma...shared_kv_swizzle{q}*](../problems/leetcuda/175.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_kv_swizzle_q.cu)
+- [ ] [flash_attn_mma...shared_kv_swizzle{qk}*](../problems/leetcuda/176.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_kv_swizzle_qk.cu)
+- [ ] [flash_attn_mma...shared_kv_swizzle{qkv}*](../problems/leetcuda/177.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_kv_swizzle_qkv.cu)
+- [ ] [flash_attn_mma...shared_qkv_swizzle{q}*](../problems/leetcuda/178.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_qkv_swizzle_q.cu)
+- [ ] [flash_attn_mma...shared_qkv_swizzle{qk}*](../problems/leetcuda/179.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_qkv_swizzle_qk.cu)
+- [ ] [flash_attn_mma...shared_qkv_swizzle{qkv}*](../problems/leetcuda/180.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_share_qkv_swizzle_qkv.cu)
+- [ ] [flash_attn_mma...tiling_qk_swizzle{q}*](../problems/leetcuda/181.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qk_swizzle_q.cu)
+- [ ] [flash_attn_mma...tiling_qk_swizzle{qk}*](../problems/leetcuda/182.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qk_swizzle_qk.cu)
+- [ ] [flash_attn_mma...tiling_qk_swizzle{qkv}*](../problems/leetcuda/183.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qk_swizzle_qkv.cu)
+- [ ] [flash_attn_mma...tiling_qkv_swizzle{q}*](../problems/leetcuda/184.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_q.cu)
+- [ ] [flash_attn_mma...tiling_qkv_swizzle{qk}*](../problems/leetcuda/185.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qk.cu)
+- [ ] [flash_attn_mma...tiling_qkv_swizzle{qkv}*](../problems/leetcuda/186.md) · f16 → f16 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qkv.cu)
+- [ ] [flash_attn...tiling_qkv_swizzle{q}{f32}*](../problems/leetcuda/187.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_q_F32F16F16F32.cu)
+- [ ] [flash_attn...tiling_qkv_swizzle{qk}{f32}*](../problems/leetcuda/188.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qk_F32F16F16F32.cu)
+- [ ] [flash_attn...tiling_qkv_swizzle{qkv}{f32}*](../problems/leetcuda/189.md) · f16 → f32 · 4 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/mma/swizzle/flash_attn_mma_tiling_qkv_swizzle_qkv_F32F16F16F32.cu)
+- [ ] [ffpa_attn_split_d_fwd_template](../problems/leetcuda/190.md) · f16 → f16 · 4 星 · [原始材料](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh)
+- [ ] [ffpa_attn_split_d_fwd_template](../problems/leetcuda/191.md) · f16 → f32 · 4 星 · [原始材料](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh)
+- [ ] [ffpa_attn_splitkv_decode_stage1_template](../problems/leetcuda/192.md) · f16 → f32 · 4 星 · [原始材料](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh)
+- [ ] [ffpa_attn_splitkv_decode_stage2_template](../problems/leetcuda/193.md) · f16 → f32 · 4 星 · [原始材料](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh)
+- [ ] [ffpa_attn_persistent_d_fwd_template](../problems/leetcuda/194.md) · f16 → f16 · 4 星 · [原始材料](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh)
+- [ ] [ffpa_attn_persistent_d_fwd_template](../problems/leetcuda/195.md) · f16 → f32 · 4 星 · [原始材料](https://github.com/xlite-dev/ffpa-attn/blob/main/csrc/cuffpa/ffpa_attn_fwd.cuh)
 
 ## Triton（5）
 
-- [ ] [triton_vector_add_kernel](../references/LeetCUDA/kernels/openai-triton/vector-add/) · all → all · 2 星
-- [ ] [triton_fused_softmax(multi-stages)](../references/LeetCUDA/kernels/openai-triton/fused-softmax/) · f16/bf16/f32 → f32 · 3 星
-- [ ] [triton_fused_layer_norm(forward-pass)](../references/LeetCUDA/kernels/openai-triton/layer-norm/) · f16/bf16/f32 → f32 · 3 星
-- [ ] [triton_fused_layer_norm(backward-pass)](../references/LeetCUDA/kernels/openai-triton/layer-norm/) · f16/bf16/f32 → f32 · 3 星
-- [ ] [triton_merge_attn_states_kernel(w/ CUDA)](../references/LeetCUDA/kernels/openai-triton/merge-attn-states/) · f16/bf16/f32 → f32 · 3 星
+- [ ] [triton_vector_add_kernel](../problems/leetcuda/196.md) · all → all · 2 星 · [原始材料](../references/LeetCUDA/kernels/openai-triton/vector-add/)
+- [ ] [triton_fused_softmax(multi-stages)](../problems/leetcuda/197.md) · f16/bf16/f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/openai-triton/fused-softmax/)
+- [ ] [triton_fused_layer_norm(forward-pass)](../problems/leetcuda/198.md) · f16/bf16/f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/openai-triton/layer-norm/)
+- [ ] [triton_fused_layer_norm(backward-pass)](../problems/leetcuda/199.md) · f16/bf16/f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/openai-triton/layer-norm/)
+- [ ] [triton_merge_attn_states_kernel(w/ CUDA)](../problems/leetcuda/200.md) · f16/bf16/f32 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/openai-triton/merge-attn-states/)
 
 ## CUTLASS / CuTe（7）
 
-- [ ] [mat_transpose_cute](../references/LeetCUDA/kernels/mat-transpose/mat_transpose_cute.cu) · f32 · 2 星
-- [ ] [flash_attn_cute(naive)](../references/LeetCUDA/kernels/flash-attn/cutlass/flash_attn_cute.cu) · f16 → f32 · 3 星
-- [ ] [hgemv_f16_cute_kernel](../references/LeetCUDA/kernels/hgemv/hgemv_cute.cu) · f16 → f16 · 3 星
-- [ ] [hgemv_f16x8_cute_kernel](../references/LeetCUDA/kernels/hgemv/hgemv_cute.cu) · f16 → f16 · 3 星
-- [ ] [hgemv_tensor_core_cute_kernel](../references/LeetCUDA/kernels/hgemv/hgemv_cute.cu) · f16 → f16 · 3 星
-- [ ] [hgemm_mma_stages_swizzle{smem}...cute*](../references/LeetCUDA/kernels/hgemm/cutlass/hgemm_mma_stage_tn_cute.cu) · f16 → f16 · 3 星
-- [ ] [ws_hgemm_naive_cute_kernel](../references/LeetCUDA/kernels/ws-hgemm/naive_ws_hgemm_sm8x.cu) · f16 → f16 · 3 星
+- [ ] [mat_transpose_cute](../problems/leetcuda/201.md) · f32 · 2 星 · [原始材料](../references/LeetCUDA/kernels/mat-transpose/mat_transpose_cute.cu)
+- [ ] [flash_attn_cute(naive)](../problems/leetcuda/202.md) · f16 → f32 · 3 星 · [原始材料](../references/LeetCUDA/kernels/flash-attn/cutlass/flash_attn_cute.cu)
+- [ ] [hgemv_f16_cute_kernel](../problems/leetcuda/203.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemv/hgemv_cute.cu)
+- [ ] [hgemv_f16x8_cute_kernel](../problems/leetcuda/204.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemv/hgemv_cute.cu)
+- [ ] [hgemv_tensor_core_cute_kernel](../problems/leetcuda/205.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemv/hgemv_cute.cu)
+- [ ] [hgemm_mma_stages_swizzle{smem}...cute*](../problems/leetcuda/206.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/hgemm/cutlass/hgemm_mma_stage_tn_cute.cu)
+- [ ] [ws_hgemm_naive_cute_kernel](../problems/leetcuda/207.md) · f16 → f16 · 3 星 · [原始材料](../references/LeetCUDA/kernels/ws-hgemm/naive_ws_hgemm_sm8x.cu)
 
 ## 新版实战与源码
 
@@ -232,11 +232,11 @@
 - [书籍章节](../references/LeetCUDA/kernels/interview/book/chapters)
 - [官方 PDF](https://github.com/xlite-dev/LeetCUDA/releases/download/v4.2.2/leetcuda-20261120.pdf)
 
-- [ ] [SGEMV](../references/LeetCUDA/kernels/interview/sgemv.cuh)
-- [ ] [SGEMM](../references/LeetCUDA/kernels/interview/sgemm.cuh)
-- [ ] [HGEMM](../references/LeetCUDA/kernels/interview/hgemm.cuh)
-- [ ] [Collective GEMM](../references/LeetCUDA/kernels/interview/collective_gemm.cuh)
-- [ ] [FP8 GEMM](../references/LeetCUDA/kernels/interview/fp8_gemm.cuh)
-- [ ] [FP4 GEMM](../references/LeetCUDA/kernels/interview/fp4_gemm.cuh)
-- [ ] [FlashAttention](../references/LeetCUDA/kernels/interview/flash_attn.cuh)
-- [ ] [FFPA Attention](../references/LeetCUDA/kernels/interview/ffpa_attn.cuh)
+- [ ] [SGEMV](../problems/leetcuda/208.md) · [原始材料](../references/LeetCUDA/kernels/interview/sgemv.cuh)
+- [ ] [SGEMM](../problems/leetcuda/209.md) · [原始材料](../references/LeetCUDA/kernels/interview/sgemm.cuh)
+- [ ] [HGEMM](../problems/leetcuda/210.md) · [原始材料](../references/LeetCUDA/kernels/interview/hgemm.cuh)
+- [ ] [Collective GEMM](../problems/leetcuda/211.md) · [原始材料](../references/LeetCUDA/kernels/interview/collective_gemm.cuh)
+- [ ] [FP8 GEMM](../problems/leetcuda/212.md) · [原始材料](../references/LeetCUDA/kernels/interview/fp8_gemm.cuh)
+- [ ] [FP4 GEMM](../problems/leetcuda/213.md) · [原始材料](../references/LeetCUDA/kernels/interview/fp4_gemm.cuh)
+- [ ] [FlashAttention](../problems/leetcuda/214.md) · [原始材料](../references/LeetCUDA/kernels/interview/flash_attn.cuh)
+- [ ] [FFPA Attention](../problems/leetcuda/215.md) · [原始材料](../references/LeetCUDA/kernels/interview/ffpa_attn.cuh)

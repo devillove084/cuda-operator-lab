@@ -1,0 +1,54 @@
+<svg width="720" height="480" viewBox="0 0 720 480" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:20px auto;">
+  <defs>
+    <marker id="dpo-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#7ec8a0"/>
+    </marker>
+  </defs>
+  <rect width="720" height="480" rx="8" fill="#222"/>
+  <text x="360" y="27" text-anchor="middle" fill="#ccc" font-family="monospace" font-size="14">DPO</text>
+
+  <rect x="28" y="48" width="664" height="46" rx="6" fill="#292929" stroke="#555" stroke-width="1"/>
+  <text x="360" y="75" text-anchor="middle" fill="#ccc" font-family="monospace" font-size="12">Offline, before training: human feedback labels the preferred y+ and rejected y- response</text>
+
+  <rect x="230" y="118" width="260" height="62" rx="5" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="360" y="143" text-anchor="middle" fill="#b7dcff" font-family="monospace" font-size="12">fixed preference example</text>
+  <text x="360" y="162" text-anchor="middle" fill="#b7dcff" font-family="monospace" font-size="12">prompt x, chosen y+, rejected y-</text>
+
+  <g stroke="#7ec8a0" stroke-width="1.5" marker-end="url(#dpo-arrow)">
+    <line x1="295" y1="180" x2="195" y2="215"/>
+    <line x1="425" y1="180" x2="525" y2="215"/>
+  </g>
+  <rect x="105" y="215" width="180" height="60" rx="5" fill="#4b2e22" stroke="#e76f51" stroke-width="1.5"/>
+  <text x="195" y="240" text-anchor="middle" fill="#f4a261" font-family="monospace" font-size="12">current policy</text>
+  <text x="195" y="258" text-anchor="middle" fill="#f4a261" font-family="monospace" font-size="12">trainable weights θ</text>
+  <rect x="435" y="215" width="180" height="60" rx="5" fill="#35265b" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="525" y="240" text-anchor="middle" fill="#c4b5fd" font-family="monospace" font-size="12">reference policy</text>
+  <text x="525" y="258" text-anchor="middle" fill="#c4b5fd" font-family="monospace" font-size="12">frozen weights θ_ref</text>
+
+  <g fill="#4b2e22" stroke="#e76f51" stroke-width="1.5">
+    <rect x="55" y="308" width="280" height="28" rx="5"/>
+    <rect x="55" y="342" width="280" height="28" rx="5"/>
+  </g>
+  <g fill="#f4a261" font-family="monospace" font-size="12" text-anchor="middle">
+    <text x="195" y="327">l+ = log piθ(y+ | x)</text>
+    <text x="195" y="361">l- = log piθ(y- | x)</text>
+  </g>
+  <g fill="#35265b" stroke="#a78bfa" stroke-width="1.5">
+    <rect x="385" y="308" width="280" height="28" rx="5"/>
+    <rect x="385" y="342" width="280" height="28" rx="5"/>
+  </g>
+  <g fill="#ddd6fe" font-family="monospace" font-size="12" text-anchor="middle">
+    <text x="525" y="327">l+ref = log pi_ref(y+ | x)</text>
+    <text x="525" y="361">l-ref = log pi_ref(y- | x)</text>
+  </g>
+  <g stroke="#7ec8a0" stroke-width="1.5" marker-end="url(#dpo-arrow)">
+    <line x1="195" y1="275" x2="195" y2="308"/>
+    <line x1="525" y1="275" x2="525" y2="308"/>
+    <line x1="195" y1="370" x2="195" y2="415"/>
+    <line x1="525" y1="370" x2="525" y2="415"/>
+  </g>
+  <rect x="82" y="415" width="556" height="38" rx="5" fill="#1e3d2d" stroke="#5cb85c" stroke-width="1.5"/>
+  <text x="360" y="432" text-anchor="middle" fill="#aaeebb" font-family="monospace" font-size="12">z = beta[(l+ - l-) - (l+ref - l-ref)]</text>
+  <text x="360" y="447" text-anchor="middle" fill="#aaeebb" font-family="monospace" font-size="12">output[0] = mean(softplus(-z)) across B preference examples</text>
+  <text x="360" y="472" text-anchor="middle" fill="#aaa" font-family="monospace" font-size="12">only the current-policy weights are updated; the reference policy stays frozen</text>
+</svg>

@@ -10,7 +10,7 @@
 | [XPUOJ](catalogs/xpuoj.md) | 144 | `practice/xpuoj/<题号>/solution.cu` |
 | [LeetCUDA](catalogs/leetcuda.md) | 215 | `practice/leetcuda/kernels/<算子>/` |
 
-少数 Python / TileLang 题使用 `solution.py`。LeetCUDA 的多个变体可能共用一份源码文件。
+每个条目都有一份 [Markdown 题面](problems/README.md)，包含实现入口与本地用例。少数 Python / TileLang 题使用 `solution.py`。LeetCUDA 的多个变体可能共用一份源码文件。
 
 ## 快速开始
 

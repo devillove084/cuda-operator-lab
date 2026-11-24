@@ -1,0 +1,62 @@
+<svg width="540" height="230" viewBox="0 0 540 230" style="display:block; margin:20px auto;" xmlns="http://www.w3.org/2000/svg">
+  <rect width="540" height="230" rx="8" fill="#222"/>
+
+  <!-- Title -->
+  <text x="270" y="22" text-anchor="middle" fill="#ccc" font-family="monospace" font-size="12">MoE Token Dispatch (T=4, E=2)</text>
+
+  <!-- Left: input tokens -->
+  <text x="80" y="48" text-anchor="middle" fill="#aaa" font-family="monospace" font-size="11">x  [T, D]</text>
+
+  <!-- Token 0 → expert 0 (blue) -->
+  <rect x="20" y="55" width="120" height="28" rx="4" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="80" y="73" text-anchor="middle" fill="#4a9eff" font-family="monospace" font-size="11">token 0  →  expert 0</text>
+
+  <!-- Token 1 → expert 1 (green) -->
+  <rect x="20" y="90" width="120" height="28" rx="4" fill="#1a3a2a" stroke="#4adf7f" stroke-width="1.5"/>
+  <text x="80" y="108" text-anchor="middle" fill="#4adf7f" font-family="monospace" font-size="11">token 1  →  expert 1</text>
+
+  <!-- Token 2 → expert 0 (blue) -->
+  <rect x="20" y="125" width="120" height="28" rx="4" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="80" y="143" text-anchor="middle" fill="#4a9eff" font-family="monospace" font-size="11">token 2  →  expert 0</text>
+
+  <!-- Token 3 → expert 1 (green) -->
+  <rect x="20" y="160" width="120" height="28" rx="4" fill="#1a3a2a" stroke="#4adf7f" stroke-width="1.5"/>
+  <text x="80" y="178" text-anchor="middle" fill="#4adf7f" font-family="monospace" font-size="11">token 3  →  expert 1</text>
+
+  <!-- Arrows for expert 0 tokens -->
+  <line x1="140" y1="69" x2="195" y2="90" stroke="#4a9eff" stroke-width="1.5" marker-end="url(#arrowblue)"/>
+  <line x1="140" y1="139" x2="195" y2="110" stroke="#4a9eff" stroke-width="1.5" marker-end="url(#arrowblue)"/>
+
+  <!-- Arrows for expert 1 tokens -->
+  <line x1="140" y1="104" x2="195" y2="155" stroke="#4adf7f" stroke-width="1.5" marker-end="url(#arrowgreen)"/>
+  <line x1="140" y1="174" x2="195" y2="170" stroke="#4adf7f" stroke-width="1.5" marker-end="url(#arrowgreen)"/>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowblue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4a9eff"/>
+    </marker>
+    <marker id="arrowgreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4adf7f"/>
+    </marker>
+  </defs>
+
+  <!-- Right: expert 0 buffer -->
+  <text x="370" y="48" text-anchor="middle" fill="#aaa" font-family="monospace" font-size="11">dispatched_x  [E, capacity, D]</text>
+
+  <text x="280" y="78" fill="#4a9eff" font-family="monospace" font-size="10">expert 0</text>
+  <rect x="200" y="83" width="160" height="24" rx="3" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.2"/>
+  <text x="280" y="99" text-anchor="middle" fill="#4a9eff" font-family="monospace" font-size="10">slot 0: token 0 features</text>
+  <rect x="200" y="108" width="160" height="24" rx="3" fill="#1a3a5c" stroke="#4a9eff" stroke-width="1.2"/>
+  <text x="280" y="124" text-anchor="middle" fill="#4a9eff" font-family="monospace" font-size="10">slot 1: token 2 features</text>
+
+  <!-- Right: expert 1 buffer -->
+  <text x="280" y="148" fill="#4adf7f" font-family="monospace" font-size="10">expert 1</text>
+  <rect x="200" y="153" width="160" height="24" rx="3" fill="#1a3a2a" stroke="#4adf7f" stroke-width="1.2"/>
+  <text x="280" y="169" text-anchor="middle" fill="#4adf7f" font-family="monospace" font-size="10">slot 0: token 1 features</text>
+  <rect x="200" y="178" width="160" height="24" rx="3" fill="#1a3a2a" stroke="#4adf7f" stroke-width="1.2"/>
+  <text x="280" y="194" text-anchor="middle" fill="#4adf7f" font-family="monospace" font-size="10">slot 1: token 3 features</text>
+
+  <!-- token_counts label -->
+  <text x="280" y="218" text-anchor="middle" fill="#888" font-family="monospace" font-size="10">token_counts = [2, 2]</text>
+</svg>

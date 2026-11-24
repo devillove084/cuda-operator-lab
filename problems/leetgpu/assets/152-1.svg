@@ -1,0 +1,40 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"
+     role="img" aria-label="6 by 6 sliding window causal mask with window_size 3: each query row sees itself and the two previous keys">
+  <rect width="200" height="200" fill="#222" rx="8"/>
+  <rect x="10" y="10" width="28" height="28" fill="#4caf50"/>
+  <rect x="40" y="10" width="28" height="28" fill="#444"/>
+  <rect x="70" y="10" width="28" height="28" fill="#444"/>
+  <rect x="100" y="10" width="28" height="28" fill="#444"/>
+  <rect x="130" y="10" width="28" height="28" fill="#444"/>
+  <rect x="160" y="10" width="28" height="28" fill="#444"/>
+  <rect x="10" y="40" width="28" height="28" fill="#4caf50"/>
+  <rect x="40" y="40" width="28" height="28" fill="#4caf50"/>
+  <rect x="70" y="40" width="28" height="28" fill="#444"/>
+  <rect x="100" y="40" width="28" height="28" fill="#444"/>
+  <rect x="130" y="40" width="28" height="28" fill="#444"/>
+  <rect x="160" y="40" width="28" height="28" fill="#444"/>
+  <rect x="10" y="70" width="28" height="28" fill="#4caf50"/>
+  <rect x="40" y="70" width="28" height="28" fill="#4caf50"/>
+  <rect x="70" y="70" width="28" height="28" fill="#4caf50"/>
+  <rect x="100" y="70" width="28" height="28" fill="#444"/>
+  <rect x="130" y="70" width="28" height="28" fill="#444"/>
+  <rect x="160" y="70" width="28" height="28" fill="#444"/>
+  <rect x="10" y="100" width="28" height="28" fill="#444"/>
+  <rect x="40" y="100" width="28" height="28" fill="#4caf50"/>
+  <rect x="70" y="100" width="28" height="28" fill="#4caf50"/>
+  <rect x="100" y="100" width="28" height="28" fill="#4caf50"/>
+  <rect x="130" y="100" width="28" height="28" fill="#444"/>
+  <rect x="160" y="100" width="28" height="28" fill="#444"/>
+  <rect x="10" y="130" width="28" height="28" fill="#444"/>
+  <rect x="40" y="130" width="28" height="28" fill="#444"/>
+  <rect x="70" y="130" width="28" height="28" fill="#4caf50"/>
+  <rect x="100" y="130" width="28" height="28" fill="#4caf50"/>
+  <rect x="130" y="130" width="28" height="28" fill="#4caf50"/>
+  <rect x="160" y="130" width="28" height="28" fill="#444"/>
+  <rect x="10" y="160" width="28" height="28" fill="#444"/>
+  <rect x="40" y="160" width="28" height="28" fill="#444"/>
+  <rect x="70" y="160" width="28" height="28" fill="#444"/>
+  <rect x="100" y="160" width="28" height="28" fill="#4caf50"/>
+  <rect x="130" y="160" width="28" height="28" fill="#4caf50"/>
+  <rect x="160" y="160" width="28" height="28" fill="#4caf50"/>
+</svg>

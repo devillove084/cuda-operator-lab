@@ -1,0 +1,74 @@
+<svg width="760" height="430" viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:20px auto;">
+  <rect width="760" height="430" fill="#222" rx="10"/>
+  <text x="380" y="28" fill="#ccc" font-family="monospace" font-size="13" text-anchor="middle">One sample: level index + normalized location &#x2192; bilinear read of the flattened pyramid</text>
+
+  <!-- flattened value tensor -->
+  <text x="40" y="58" fill="#aaa" font-family="monospace" font-size="12">value rows</text>
+  <rect x="140" y="46" width="240" height="26" fill="#1d4ed8" rx="3"/>
+  <rect x="380" y="46" width="120" height="26" fill="#2563eb" rx="3"/>
+  <rect x="500" y="46" width="60" height="26" fill="#60a5fa" rx="3"/>
+  <text x="260" y="64" fill="#fff" font-family="monospace" font-size="11" text-anchor="middle">level 0: H0&#xb7;W0 rows</text>
+  <text x="440" y="64" fill="#fff" font-family="monospace" font-size="11" text-anchor="middle">level 1</text>
+  <text x="530" y="64" fill="#0b1220" font-family="monospace" font-size="11" text-anchor="middle">level 2</text>
+  <line x1="140" y1="76" x2="140" y2="84" stroke="#888" stroke-width="1"/>
+  <line x1="380" y1="76" x2="380" y2="84" stroke="#888" stroke-width="1"/>
+  <line x1="500" y1="76" x2="500" y2="84" stroke="#888" stroke-width="1"/>
+  <text x="140" y="98" fill="#888" font-family="monospace" font-size="10" text-anchor="middle">0</text>
+  <text x="380" y="98" fill="#888" font-family="monospace" font-size="10" text-anchor="middle">level_start[1]</text>
+  <text x="505" y="98" fill="#888" font-family="monospace" font-size="10" text-anchor="middle">level_start[2]</text>
+  <text x="600" y="56" fill="#aaa" font-family="monospace" font-size="11">each row holds</text>
+  <text x="600" y="70" fill="#aaa" font-family="monospace" font-size="11">num_heads &#xd7; head_dim</text>
+
+  <!-- level grid with the sampling point -->
+  <text x="130" y="134" fill="#aaa" font-family="monospace" font-size="12" text-anchor="middle">level l grid (H_l &#xd7; W_l)</text>
+  <rect x="70" y="144" width="120" height="120" fill="#2d2d2d" stroke="#555" stroke-width="1"/>
+  <line x1="110" y1="144" x2="110" y2="264" stroke="#555" stroke-width="1"/>
+  <line x1="150" y1="144" x2="150" y2="264" stroke="#555" stroke-width="1"/>
+  <line x1="70" y1="184" x2="190" y2="184" stroke="#555" stroke-width="1"/>
+  <line x1="70" y1="224" x2="190" y2="224" stroke="#555" stroke-width="1"/>
+  <rect x="110" y="184" width="40" height="40" fill="#0f766e" fill-opacity="0.5" stroke="#2dd4bf" stroke-width="1.5"/>
+  <circle cx="134" cy="208" r="4.5" fill="#f472b6"/>
+  <text x="130" y="288" fill="#aaa" font-family="monospace" font-size="11" text-anchor="middle">x = loc_x&#xb7;W_l &#x2212; 0.5</text>
+  <text x="130" y="304" fill="#aaa" font-family="monospace" font-size="11" text-anchor="middle">y = loc_y&#xb7;H_l &#x2212; 0.5</text>
+
+  <line x1="196" y1="204" x2="286" y2="204" stroke="#888" stroke-width="1.4" marker-end="url(#arr123)"/>
+  <text x="241" y="196" fill="#888" font-family="monospace" font-size="10" text-anchor="middle">zoom</text>
+
+  <!-- bilinear zoom -->
+  <rect x="300" y="144" width="130" height="130" fill="#2d2d2d" stroke="#2dd4bf" stroke-width="1.5"/>
+  <circle cx="300" cy="144" r="7" fill="#1d4ed8"/>
+  <circle cx="430" cy="144" r="7" fill="#1d4ed8"/>
+  <circle cx="300" cy="274" r="7" fill="#1d4ed8"/>
+  <circle cx="430" cy="274" r="7" fill="#1d4ed8"/>
+  <circle cx="378" cy="196" r="4.5" fill="#f472b6"/>
+  <line x1="300" y1="196" x2="430" y2="196" stroke="#f472b6" stroke-width="0.8" stroke-dasharray="3 3"/>
+  <line x1="378" y1="144" x2="378" y2="274" stroke="#f472b6" stroke-width="0.8" stroke-dasharray="3 3"/>
+  <text x="296" y="134" fill="#ccc" font-family="monospace" font-size="10" text-anchor="end">(y0, x0)</text>
+  <text x="434" y="134" fill="#ccc" font-family="monospace" font-size="10">(y0, x0+1)</text>
+  <text x="296" y="292" fill="#ccc" font-family="monospace" font-size="10" text-anchor="end">(y0+1, x0)</text>
+  <text x="434" y="292" fill="#ccc" font-family="monospace" font-size="10">(y0+1, x0+1)</text>
+  <text x="365" y="212" fill="#f472b6" font-family="monospace" font-size="10" text-anchor="end">dx</text>
+  <text x="388" y="170" fill="#f472b6" font-family="monospace" font-size="10">dy</text>
+  <text x="365" y="316" fill="#aaa" font-family="monospace" font-size="11" text-anchor="middle">row = level_start[l] + r&#xb7;W_l + c</text>
+
+  <!-- accumulation -->
+  <rect x="470" y="144" width="250" height="130" fill="#2d2d2d" rx="6"/>
+  <text x="484" y="166" fill="#ccc" font-family="monospace" font-size="11">sample = &#x3a3; w_ij &#xb7; pixel(y0+i, x0+j)</text>
+  <rect x="484" y="180" width="222" height="24" fill="#b45309" rx="3"/>
+  <text x="595" y="197" fill="#fff" font-family="monospace" font-size="11" text-anchor="middle">&#xd7; attn_weight[q, h, l, p]</text>
+  <rect x="484" y="212" width="222" height="24" fill="#9333ea" rx="3"/>
+  <text x="595" y="229" fill="#fff" font-family="monospace" font-size="11" text-anchor="middle">&#x3a3; over num_levels &#xd7; num_points</text>
+  <rect x="484" y="244" width="222" height="20" fill="#0f766e" rx="3"/>
+  <text x="595" y="258" fill="#fff" font-family="monospace" font-size="11" text-anchor="middle">output[q, h, :]  (head_dim values)</text>
+
+  <rect x="40" y="340" width="680" height="70" fill="#2d2d2d" rx="6"/>
+  <text x="380" y="362" fill="#ccc" font-family="monospace" font-size="11" text-anchor="middle">every (query, head) reduces num_levels &#xd7; num_points interpolated samples into one head_dim vector</text>
+  <text x="380" y="380" fill="#ccc" font-family="monospace" font-size="11" text-anchor="middle">corners that fall outside the level grid contribute zero, so locations may leave [0, 1]</text>
+  <text x="380" y="398" fill="#ccc" font-family="monospace" font-size="11" text-anchor="middle">each level uses its own H_l, W_l: the same normalized location lands on a different pixel per level</text>
+
+  <defs>
+    <marker id="arr123" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#888"/>
+    </marker>
+  </defs>
+</svg>

@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 720" width="430" height="720" style="display:block; margin:20px auto;">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#999"/>
+    </marker>
+    <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#cc9944"/>
+    </marker>
+  </defs>
+  <rect width="430" height="720" fill="#222"/>
+
+  <!-- ===== conditioning branch ===== -->
+  <text x="95" y="20" text-anchor="middle" fill="#ccc" font-size="13" font-family="monospace">c (batch, 512)</text>
+  <line x1="95" y1="28" x2="95" y2="46" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="20" y="49" width="150" height="30" rx="5" fill="#4d3a1e" stroke="#cc9944" stroke-width="1"/>
+  <text x="95" y="69" text-anchor="middle" fill="#eecc99" font-size="12" font-family="sans-serif">SiLU</text>
+  <line x1="95" y1="79" x2="95" y2="97" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="20" y="100" width="150" height="30" rx="5" fill="#4d3a1e" stroke="#cc9944" stroke-width="1"/>
+  <text x="95" y="120" text-anchor="middle" fill="#eecc99" font-size="12" font-family="sans-serif">Linear 512 &#8594; 3072</text>
+  <line x1="95" y1="130" x2="95" y2="148" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="20" y="151" width="150" height="52" rx="5" fill="#333" stroke="#cc9944" stroke-width="1"/>
+  <text x="95" y="169" text-anchor="middle" fill="#eecc99" font-size="10" font-family="monospace">shift_msa scale_msa gate_msa</text>
+  <text x="95" y="190" text-anchor="middle" fill="#eecc99" font-size="10" font-family="monospace">shift_mlp scale_mlp gate_mlp</text>
+
+  <!-- modulation bus -->
+  <line x1="170" y1="177" x2="185" y2="177" stroke="#cc9944" stroke-width="1.5"/>
+  <line x1="185" y1="115" x2="185" y2="606" stroke="#cc9944" stroke-width="1.5"/>
+  <line x1="185" y1="115" x2="200" y2="115" stroke="#cc9944" stroke-width="1.5" marker-end="url(#ahg)"/>
+  <line x1="185" y1="306" x2="264" y2="306" stroke="#cc9944" stroke-width="1.5" marker-end="url(#ahg)"/>
+  <line x1="185" y1="453" x2="200" y2="453" stroke="#cc9944" stroke-width="1.5" marker-end="url(#ahg)"/>
+  <line x1="185" y1="606" x2="264" y2="606" stroke="#cc9944" stroke-width="1.5" marker-end="url(#ahg)"/>
+
+  <!-- ===== main branch ===== -->
+  <text x="280" y="20" text-anchor="middle" fill="#ccc" font-size="13" font-family="monospace">x (batch, seq_len, 512)</text>
+  <line x1="280" y1="28" x2="280" y2="46" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- residual 1 -->
+  <line x1="280" y1="36" x2="390" y2="36" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="390" y1="36" x2="390" y2="348" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="390" y1="348" x2="297" y2="348" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#ah)"/>
+
+  <rect x="200" y="49" width="160" height="30" rx="5" fill="#333" stroke="#777" stroke-width="1"/>
+  <text x="280" y="69" text-anchor="middle" fill="#ccc" font-size="12" font-family="sans-serif">LayerNorm (no affine)</text>
+  <line x1="280" y1="79" x2="280" y2="97" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="100" width="160" height="30" rx="5" fill="#4d3a1e" stroke="#cc9944" stroke-width="1"/>
+  <text x="280" y="120" text-anchor="middle" fill="#eecc99" font-size="12" font-family="sans-serif">Modulate (scale, shift)</text>
+  <line x1="280" y1="130" x2="280" y2="148" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="151" width="160" height="30" rx="5" fill="#1e2d4d" stroke="#4477bb" stroke-width="1"/>
+  <text x="280" y="171" text-anchor="middle" fill="#aaccee" font-size="12" font-family="sans-serif">QKV Projection</text>
+  <line x1="280" y1="181" x2="280" y2="199" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="202" width="160" height="30" rx="5" fill="#1e2d4d" stroke="#4477bb" stroke-width="1"/>
+  <text x="280" y="222" text-anchor="middle" fill="#aaccee" font-size="12" font-family="sans-serif">Self-Attention (8 heads)</text>
+  <line x1="280" y1="232" x2="280" y2="250" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="253" width="160" height="30" rx="5" fill="#1e2d4d" stroke="#4477bb" stroke-width="1"/>
+  <text x="280" y="273" text-anchor="middle" fill="#aaccee" font-size="12" font-family="sans-serif">Output Projection</text>
+  <line x1="280" y1="283" x2="280" y2="294" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <circle cx="280" cy="306" r="12" fill="#222" stroke="#cc9944" stroke-width="1.5"/>
+  <text x="280" y="311" text-anchor="middle" fill="#eecc99" font-size="14" font-family="sans-serif">&#8857;</text>
+  <line x1="280" y1="318" x2="280" y2="336" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <circle cx="280" cy="348" r="12" fill="#222" stroke="#999" stroke-width="1.5"/>
+  <text x="280" y="353" text-anchor="middle" fill="#ccc" font-size="15" font-family="sans-serif" font-weight="bold">+</text>
+  <line x1="280" y1="360" x2="280" y2="384" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- residual 2 -->
+  <line x1="280" y1="372" x2="410" y2="372" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="410" y1="372" x2="410" y2="648" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="410" y1="648" x2="297" y2="648" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#ah)"/>
+
+  <rect x="200" y="387" width="160" height="30" rx="5" fill="#333" stroke="#777" stroke-width="1"/>
+  <text x="280" y="407" text-anchor="middle" fill="#ccc" font-size="12" font-family="sans-serif">LayerNorm (no affine)</text>
+  <line x1="280" y1="417" x2="280" y2="435" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="438" width="160" height="30" rx="5" fill="#4d3a1e" stroke="#cc9944" stroke-width="1"/>
+  <text x="280" y="458" text-anchor="middle" fill="#eecc99" font-size="12" font-family="sans-serif">Modulate (scale, shift)</text>
+  <line x1="280" y1="468" x2="280" y2="486" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="489" width="160" height="30" rx="5" fill="#1e3d2d" stroke="#44aa66" stroke-width="1"/>
+  <text x="280" y="509" text-anchor="middle" fill="#aaeebb" font-size="12" font-family="sans-serif">GELU&#40;Linear 512&#8594;2048&#41;</text>
+  <line x1="280" y1="519" x2="280" y2="537" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <rect x="200" y="540" width="160" height="30" rx="5" fill="#1e3d2d" stroke="#44aa66" stroke-width="1"/>
+  <text x="280" y="560" text-anchor="middle" fill="#aaeebb" font-size="12" font-family="sans-serif">Linear 2048 &#8594; 512</text>
+  <line x1="280" y1="570" x2="280" y2="594" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <circle cx="280" cy="606" r="12" fill="#222" stroke="#cc9944" stroke-width="1.5"/>
+  <text x="280" y="611" text-anchor="middle" fill="#eecc99" font-size="14" font-family="sans-serif">&#8857;</text>
+  <line x1="280" y1="618" x2="280" y2="636" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <circle cx="280" cy="648" r="12" fill="#222" stroke="#999" stroke-width="1.5"/>
+  <text x="280" y="653" text-anchor="middle" fill="#ccc" font-size="15" font-family="sans-serif" font-weight="bold">+</text>
+  <line x1="280" y1="660" x2="280" y2="684" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <text x="280" y="702" text-anchor="middle" fill="#ccc" font-size="13" font-family="monospace">output (batch, seq_len, 512)</text>
+</svg>

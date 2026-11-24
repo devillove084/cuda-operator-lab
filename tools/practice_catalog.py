@@ -20,6 +20,7 @@ from practice_leetcuda_suites import suite_cases
 ROOT = Path(__file__).resolve().parent.parent
 PLATFORMS = {"leetgpu": "LeetGPU", "leetcuda": "LeetCUDA", "xpuoj": "XPUOJ"}
 ROW = re.compile(r"^- \[([ xX])\] (?:(#\d+) )?\[([^\]]+)\]\(([^)]+)\)(.*)$")
+ORIGINAL_LINK = re.compile(r"\s*·\s*\[原始材料\]\(([^)]+)\)\s*$")
 ENTRYPOINT = re.compile(r'extern\s+"C"\s+void\s+run_kernel\s*\([^;{}]*\)\s*;')
 LEETCUDA_UPSTREAM = ROOT / "references" / "LeetCUDA"
 LEETCUDA_WORKSPACE = ROOT / "practice" / "leetcuda"
@@ -62,6 +63,11 @@ def problems():
             if not match:
                 continue
             state, number, title, link, detail = match.groups()
+            if link.startswith("../problems/"):
+                original = ORIGINAL_LINK.search(detail)
+                if original is None:
+                    raise ValueError(f"{catalog.name} 的原始材料链接缺失 · {title}")
+                link, detail = original[1], detail[:original.start()]
             count += 1
             path = None if link.startswith(("http://", "https://")) else (
                 catalog.parent / unquote(link)
@@ -289,6 +295,10 @@ def list_problems(status, platform):
 
 
 def statement(problem):
+    markdown = ROOT / "problems" / problem.platform / f"{problem.key}.md"
+    if markdown.is_file():
+        print(markdown.read_text(), end="")
+        return
     print(f"# {PLATFORMS[problem.platform]} #{problem.key} {problem.title}\n")
     print("实现文件", solution(problem).relative_to(ROOT))
     print("测试入口", test_description(problem), "\n")

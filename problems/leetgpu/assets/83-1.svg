@@ -1,0 +1,47 @@
+<svg width="640" height="190" viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg"
+     style="display:block; margin:20px auto;">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#999"/>
+    </marker>
+  </defs>
+  <rect width="640" height="190" fill="#222" rx="8"/>
+
+  <!-- x box -->
+  <rect x="20" y="45" width="70" height="36" fill="#1a3a5c" rx="4"/>
+  <text x="55" y="68" fill="#7ec8e3" font-family="monospace" font-size="14" text-anchor="middle">x</text>
+
+  <!-- residual box -->
+  <rect x="20" y="105" width="70" height="36" fill="#1a3a5c" rx="4"/>
+  <text x="55" y="128" fill="#7ec8e3" font-family="monospace" font-size="12" text-anchor="middle">residual</text>
+
+  <!-- arrows into add -->
+  <line x1="90" y1="63"  x2="148" y2="90"  stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="90" y1="123" x2="148" y2="110" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- add circle -->
+  <circle cx="165" cy="100" r="18" fill="#2d5a27" stroke="#5a9c52" stroke-width="1.5"/>
+  <text x="165" y="107" fill="#ccc" font-family="monospace" font-size="18" text-anchor="middle">+</text>
+
+  <!-- z label above arrow -->
+  <text x="248" y="88" fill="#aaa" font-family="monospace" font-size="12" text-anchor="middle">z = x + residual</text>
+
+  <!-- arrow from add to rms box -->
+  <line x1="183" y1="100" x2="308" y2="100" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- RMS Norm box -->
+  <rect x="308" y="82" width="120" height="36" fill="#2d3a5c" rx="4"/>
+  <text x="368" y="105" fill="#7ec8e3" font-family="monospace" font-size="13" text-anchor="middle">RMS Norm</text>
+
+  <!-- weight box -->
+  <rect x="308" y="140" width="120" height="36" fill="#1a3a5c" rx="4"/>
+  <text x="368" y="163" fill="#7ec8e3" font-family="monospace" font-size="13" text-anchor="middle">&#215; weight</text>
+  <line x1="368" y1="140" x2="368" y2="118" stroke="#5a9c52" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- arrow to out -->
+  <line x1="428" y1="100" x2="508" y2="100" stroke="#999" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- out box -->
+  <rect x="508" y="82" width="70" height="36" fill="#1a5c2d" rx="4"/>
+  <text x="543" y="105" fill="#7ec8e3" font-family="monospace" font-size="14" text-anchor="middle">out</text>
+</svg>
