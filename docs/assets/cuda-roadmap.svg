@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1060 450" width="1060" height="450" role="img" aria-labelledby="title desc">
+  <title id="title">CUDA 算子学习路线</title>
+  <desc id="desc">六个阶段依次是索引与合并访存、归约与同步、数值稳定与融合、矩阵乘与 CuTe、推理 Attention、递推状态与反向。</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="46%" r="72%">
+      <stop offset="0" stop-color="#2b3e34"/>
+      <stop offset="1" stop-color="#151d1a"/>
+    </radialGradient>
+    <linearGradient id="chip" x2="0" y2="1">
+      <stop offset="0" stop-color="#374e3c"/>
+      <stop offset="1" stop-color="#23352c"/>
+    </linearGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0v24" fill="none" stroke="#b8d8c1" stroke-opacity=".07"/>
+    </pattern>
+  </defs>
+
+  <rect x="1" y="1" width="1058" height="448" rx="24" fill="url(#bg)" stroke="#3d5448" stroke-width="2"/>
+  <rect x="2" y="2" width="1056" height="446" rx="23" fill="url(#grid)"/>
+
+  <g fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M416 193h-32l-32-107h-32" stroke="#c2df91"/>
+    <path d="M416 225h-96" stroke="#8bd0a5"/>
+    <path d="M416 257h-32l-32 105h-32" stroke="#7ccbcc"/>
+    <path d="M644 193h32l32-107h32" stroke="#e7cc87"/>
+    <path d="M644 225h96" stroke="#efa283"/>
+    <path d="M644 257h32l32 105h32" stroke="#d7b6e3"/>
+  </g>
+
+  <g fill="none" stroke="#93ac93" opacity=".52">
+    <rect x="402" y="152" width="256" height="146" rx="23" stroke-dasharray="3 5"/>
+    <path d="M488 152v-16m28 16v-16m28 16v-16m28 16v-16m-84 162v16m28-16v16m28-16v16m28-16v16" stroke-linecap="round"/>
+  </g>
+  <rect x="416" y="163" width="228" height="124" rx="17" fill="url(#chip)" stroke="#b5d6a0" stroke-width="1.5"/>
+
+  <g font-family="system-ui, 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+    <text x="530" y="210" text-anchor="middle" fill="#deedce" font-weight="740" font-size="29" letter-spacing="3">CUDA</text>
+    <text x="530" y="245" text-anchor="middle" fill="#f4f4e8" font-weight="650" font-size="25">算子学习路线</text>
+    <g transform="translate(30 37)">
+      <rect width="290" height="100" rx="14" fill="#202d27" stroke="#c2df91" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="16" y="16" width="39" height="31" rx="8" fill="#c2df91" fill-opacity=".13"/>
+      <text x="35.5" y="38" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="17" font-weight="650" fill="#c2df91">01</text>
+      <text x="67" y="39" fill="#f3f3eb" font-size="22" font-weight="650">索引与合并访存</text>
+      <text x="20" y="75" fill="#c4d1c5" font-size="15">Grid · Block · Transpose</text>
+    </g>
+    <g transform="translate(30 175)">
+      <rect width="290" height="100" rx="14" fill="#202d27" stroke="#8bd0a5" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="16" y="16" width="39" height="31" rx="8" fill="#8bd0a5" fill-opacity=".13"/>
+      <text x="35.5" y="38" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="17" font-weight="650" fill="#8bd0a5">02</text>
+      <text x="67" y="39" fill="#f3f3eb" font-size="22" font-weight="650">归约与同步</text>
+      <text x="20" y="75" fill="#c4d1c5" font-size="15">Warp Shuffle · Atomics</text>
+    </g>
+    <g transform="translate(30 313)">
+      <rect width="290" height="100" rx="14" fill="#202d27" stroke="#7ccbcc" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="16" y="16" width="39" height="31" rx="8" fill="#7ccbcc" fill-opacity=".13"/>
+      <text x="35.5" y="38" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="17" font-weight="650" fill="#7ccbcc">03</text>
+      <text x="67" y="39" fill="#f3f3eb" font-size="22" font-weight="650">数值稳定与融合</text>
+      <text x="20" y="75" fill="#c4d1c5" font-size="15">Softmax · LayerNorm</text>
+    </g>
+    <g transform="translate(740 37)">
+      <rect width="290" height="100" rx="14" fill="#202d27" stroke="#e7cc87" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="16" y="16" width="39" height="31" rx="8" fill="#e7cc87" fill-opacity=".13"/>
+      <text x="35.5" y="38" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="17" font-weight="650" fill="#e7cc87">04</text>
+      <text x="67" y="39" fill="#f3f3eb" font-size="22" font-weight="650">矩阵乘与 CuTe</text>
+      <text x="20" y="75" fill="#c4d1c5" font-size="15">Tensor Core · Grouped GEMM</text>
+    </g>
+    <g transform="translate(740 175)">
+      <rect width="290" height="100" rx="14" fill="#202d27" stroke="#efa283" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="16" y="16" width="39" height="31" rx="8" fill="#efa283" fill-opacity=".13"/>
+      <text x="35.5" y="38" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="17" font-weight="650" fill="#efa283">05</text>
+      <text x="67" y="39" fill="#f3f3eb" font-size="22" font-weight="650">推理 Attention</text>
+      <text x="20" y="75" fill="#c4d1c5" font-size="15">Paged KV · Split-KV · MoE</text>
+    </g>
+    <g transform="translate(740 313)">
+      <rect width="290" height="100" rx="14" fill="#202d27" stroke="#d7b6e3" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="16" y="16" width="39" height="31" rx="8" fill="#d7b6e3" fill-opacity=".13"/>
+      <text x="35.5" y="38" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="17" font-weight="650" fill="#d7b6e3">06</text>
+      <text x="67" y="39" fill="#f3f3eb" font-size="22" font-weight="650">递推状态与反向</text>
+      <text x="20" y="75" fill="#c4d1c5" font-size="15">GLA · Gated Delta · Backward</text>
+    </g>
+  </g>
+</svg>

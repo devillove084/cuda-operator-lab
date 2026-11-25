@@ -1,6 +1,10 @@
 # CUDA 算子学习路线
 
-你现在处在**了解阶段**。用第一周从空文件写出 3 个正确的 CUDA kernel，再用一次 profile 把代码和 GPU 行为对应起来。按照每周 5–7 小时安排，下面是约 16 周的节奏。每个阶段以自测证据为准，可以在某一阶段多留几周。
+[首页](../README.md) · [进度清单](progress.md) · [全部题目](../problems/README.md)
+
+![六阶段思维导图。左侧从索引与访存到归约与融合，右侧从 GEMM 到推理 Attention 和反向传播。](assets/cuda-roadmap.svg)
+
+第一次写 CUDA，从阶段 1 开始。用第一周从空实现写出三个正确的 kernel，再用一次 profile 把代码和 GPU 行为对应起来。每周安排 5–7 小时，下面的主线约 16 周。以验收结果决定什么时候进入下一阶段。
 
 ## 第一周直接开始
 
@@ -21,14 +25,16 @@ cd ~/cuda-operator-lab
 
 | 阶段 | 建议时间 | 主线 | 阶段产出 |
 | --- | --- | --- | --- |
-| 1 · 写出第一个 CUDA kernel | 第 1–2 周 | 索引、launch、边界、合并访存 | 3 道 AC，1 份访存实验 |
-| 2 · 掌握归约与同步 | 第 3–4 周 | warp、CTA、shared memory、原子操作 | 2 个 reduction 实现，1 次竞态检查 |
-| 3 · 写稳定的融合算子 | 第 5–6 周 | safe softmax、FP32 累加、LayerNorm、RMSNorm | 用数值反例说明稳定性，测融合收益 |
-| 4 · 读懂 GEMM 和 CuTe | 第 7–10 周 | tiling、layout、Tensor Core、pipeline | 3 个 GEMM 版本，1 组库基线 |
-| 5 · 做推理 Attention | 第 11–13 周 | 在线 softmax、分页 KV、GQA、Split-KV | 1 个 paged decode 实验报告 |
-| 6 · 做状态算子和反向 | 第 14–16 周 | GLA、Gated Delta、变长、状态梯度 | 1 份可复现实验与源码分析 |
+| [1 · 写出第一个 CUDA kernel](#stage-1) | 第 1–2 周 | 索引、launch、边界、合并访存 | 3 道 AC，1 份访存实验 |
+| [2 · 掌握归约与同步](#stage-2) | 第 3–4 周 | warp、CTA、shared memory、原子操作 | 2 个 reduction 实现，1 次竞态检查 |
+| [3 · 写稳定的融合算子](#stage-3) | 第 5–6 周 | safe softmax、FP32 累加、LayerNorm、RMSNorm | 用数值反例说明稳定性，测融合收益 |
+| [4 · 读懂 GEMM 和 CuTe](#stage-4) | 第 7–10 周 | tiling、layout、Tensor Core、pipeline | 3 个 GEMM 版本，1 组库基线 |
+| [5 · 做推理 Attention](#stage-5) | 第 11–13 周 | 在线 softmax、分页 KV、GQA、Split-KV | 1 个 paged decode 实验报告 |
+| [6 · 做状态算子和反向](#stage-6) | 第 14–16 周 | GLA、Gated Delta、变长、状态梯度 | 1 份可复现实验与源码分析 |
 
-`./practice.sh selftest <阶段>` 逐题运行当前实现，汇总每题通过或失败。加 `--smoke` 每题只跑第 1 例，加 `--plan` 列出命令。进度复选框由你根据完整测试和手工验收更新。LeetCUDA 有些代码是可运行的上游实现，把它作为阅读对象，随后独立复现一个核心内核来验收。
+`./practice.sh selftest <阶段>` 逐题运行当前实现，汇总每题通过或失败。加 `--smoke` 每题只跑第 1 例，加 `--plan` 列出命令。每做完一小节，用 `./practice.sh progress --edit` 在[个人清单](progress.md)打勾。LeetCUDA 有些代码是可运行的上游实现，把它作为阅读对象，随后独立复现一个核心内核来验收。
+
+<a name="stage-1"></a>
 
 ## 1 · 索引、边界和合并访存
 
@@ -36,6 +42,8 @@ cd ~/cuda-operator-lab
 - **动手** 用方阵和非方阵比较朴素转置、共享内存 tile、带 padding 的共享内存 tile。写出每个 warp 发出的全局地址。向量题先写标量访问，再学向量化和尾部回退。
 - **自测** `./practice.sh selftest 1`。手算长度 1、31、32、33、257 的边界。用 `./practice.sh bench leetgpu 1 --case 1` 测 31 个元素，用 `--case 8` 测 16,777,217 个元素，再比较不同 block 大小。对 FP32 向量加法，有效带宽使用 `12×N/时间`，给出单位和输入长度。解释小输入为何更容易被 launch 成本主导。
 - **过关证据** 3 道 AC。画出线程到内存地址的映射，并记录一个性能差异及对应的访存现象。
+
+<a name="stage-2"></a>
 
 ## 2 · 归约和原子操作
 
@@ -51,12 +59,16 @@ compute-sanitizer --tool racecheck --target-processes all --error-exitcode 99 \
   ./practice.sh test leetgpu 4 --case 1
 ~~~
 
+<a name="stage-3"></a>
+
 ## 3 · 数值稳定、归一化与融合
 
 - **主做** [Softmax](../problems/leetgpu/5.md)、[LayerNorm](../problems/leetgpu/113.md)、[RMSNorm](../problems/leetgpu/50.md)、[Fused Residual Add and RMSNorm](../problems/leetgpu/83.md)。最后做 [Quack Cross Entropy 前反向](../problems/quack/1.md)。延伸阅读 [LeetCUDA Online Safe Softmax](../problems/leetcuda/97.md)。
 - **动手** 从朴素指数推到 subtract-max 与在线状态 `(m, l)`。LayerNorm 用稳定的方差计算，理解接近常数的行为什么容易损失有效位。按题面约定 FP16/BF16 的输入输出与 FP32 中间值。写拆分和融合两个版本，在同一布局做 A/B。
 - **自测** `./practice.sh selftest 3`。手造含大 logits 的行、近常数行、非整向量宽度和单元素行，比较 float64 参考的最大绝对误差与接近零时的绝对误差。用 `./practice.sh profile leetgpu 83 --case 0` 记录 launch 数量，比较融合前后 p50 和主要读写量。
 - **过关证据** 5 道 AC。能给出一个让朴素版失败的输入，并用时间线验证融合前后 launch 数的改变。
+
+<a name="stage-4"></a>
 
 ## 4 · GEMM、Tensor Core 与 CuTe
 
@@ -65,12 +77,16 @@ compute-sanitizer --tool racecheck --target-processes all --error-exitcode 99 \
 - **自测** `./practice.sh selftest 4`。给方阵、小 M、非对齐矩形各保留一个数据点。用 `./practice.sh bench leetgpu 2`，记录 `2MNK/时间` 和 p50。另用相同 dtype、layout、TF32 配置、累加与 epilogue 对比 cuBLAS 或 CUTLASS Profiler。确认 Tensor Core 用量和寄存器、共享内存消耗。
 - **过关证据** 三种手写版本可复跑。解释一次优化在大矩阵有效、在小 M 上无效或变慢的原因，给出可指向具体计数器的证据。
 
+<a name="stage-5"></a>
+
 ## 5 · 推理 Attention 与分页 KV
 
 - **主做** [Softmax Attention](../problems/leetgpu/6.md) → [FlashAttention 不等长滑窗](../problems/flashattn/1.md) → [Paged Gather](../problems/flashinfer/1.md) → [Paged Append](../problems/flashinfer/2.md) → [Split-KV Merge](../problems/flashinfer/3.md) → [Paged GQA Decode](../problems/flashinfer/4.md)。完成 [vLLM MoE 路由分桶](../problems/vllm/1.md)，把计数、前缀和、散射接到阶段 4 的分组 GEMM 思路。
 - **动手** 画两个序列的物理页表，手算尾页、共享首个满页和 GQA head 分组。对比单 CTA 扫全序列与 split-KV 后再合并的方案，记录每种方案的 scratch 大小和 launch 数。理解 prefill 和 decode 的 Q 长度及并行度差别。对照仓库的 [FlashInfer 源码](../references/FlashInfer/README.md)。
 - **自测** `./practice.sh selftest 5`。单 token 时输出等于 V，全空时输出为 0 且 LSE 为负无穷。用 `./practice.sh bench flashinfer 4 --case 7` 测长上下文，用 `--case 8` 测较大 batch，用 `--case 1` 看单步。再用 `./practice.sh profile flashinfer 4 --case 7 --tool ncu` 观察显存流量和并行度。
 - **过关证据** 所有用例 AC，至少两种不同形状的延迟与解释。用同页大小、有效 KV 长度、GQA head 数、dtype、LSE 输出和 CUDA Graph 设置对照本机可用的优化库。把 plan/metadata 预处理和稳态 run 分开测。
+
+<a name="stage-6"></a>
 
 ## 6 · 递推状态、变长和反向
 

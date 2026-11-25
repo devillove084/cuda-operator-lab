@@ -18,12 +18,26 @@ backend() {
     "$python" "$root/tools/practice_catalog.py" "$@"
 }
 
+edit_file() {
+    local -a editor_command
+    read -r -a editor_command <<< "${PRACTICE_EDITOR:-${VISUAL:-${EDITOR:-vi}}}"
+    (cd "$root" && "${editor_command[@]}" "$1")
+}
+
 edit() {
     local file
-    local -a editor_command
     file=$(backend source "$@") || return
-    read -r -a editor_command <<< "${PRACTICE_EDITOR:-${VISUAL:-${EDITOR:-vi}}}"
-    (cd "$root" && "${editor_command[@]}" "$file")
+    edit_file "$file"
+}
+
+progress() {
+    if [[ $# == 1 && $1 == --edit ]]; then
+        local file
+        file=$(backend progress --edit) || return
+        edit_file "$file"
+    else
+        backend progress "$@"
+    fi
 }
 
 menu() {
@@ -100,7 +114,8 @@ usage() {
 ./practice.sh profile 题库 题号 [--tool ncu]             保存 Nsight Systems 时间线
 ./practice.sh audit                                    检查题库、练习文件和测试入口
 ./practice.sh roadmap                                  查看完整学习路线
-./practice.sh selftest 1 [--plan] [--smoke]                         运行指定阶段的自测
+./practice.sh progress [--edit]                       查看或编辑自己的进度清单
+./practice.sh selftest 1 [--plan] [--smoke]            运行指定阶段的自测
 
 用 ./practice.sh platforms 查看题库名称。LeetCUDA 用函数名或清单显示的编号。
 HELP
@@ -111,6 +126,7 @@ case "${1:-}" in
     help|-h|--help) usage ;;
     edit) shift; edit "$@" ;;
     roadmap) cat "$root/docs/roadmap.md" ;;
+    progress) shift; progress "$@" ;;
     selftest) shift; "$python" "$root/tools/practice_roadmap.py" "$@" ;;
     list|show|test|bench|profile|toggle|preview|audit|source|cases|platforms) backend "$@" ;;
     *) usage >&2; exit 2 ;;

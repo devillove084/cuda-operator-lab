@@ -608,6 +608,8 @@ def main():
     listing.add_argument("platform", nargs="?", default="all", choices=("all", *PLATFORMS))
     actions.add_parser("audit")
     actions.add_parser("platforms")
+    progress = actions.add_parser("progress")
+    progress.add_argument("--edit", action="store_true")
     case_list = actions.add_parser("cases")
     case_list.add_argument("platform", nargs="?", default="all", choices=("all", *PLATFORMS))
     case_list.add_argument("key", nargs="?")
@@ -635,6 +637,16 @@ def main():
         print("all\t全部题库")
         for name, title in PLATFORMS.items():
             print(name, title, sep="\t")
+        return
+    if args.action == "progress":
+        template = ROOT / "docs" / "progress.md"
+        personal = template.with_name("progress.local.md")
+        if args.edit:
+            write_new(personal, template.read_bytes())
+            print(personal)
+        else:
+            checklist = personal if personal.is_file() else template
+            print(checklist.read_text(), end="")
         return
     if args.action == "audit":
         audit()
