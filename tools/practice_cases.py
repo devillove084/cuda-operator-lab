@@ -6,9 +6,10 @@ import sys
 
 import torch
 
+from practice_advanced_cases import ADVANCED, advanced_plan
 from practice_catalog import PLATFORMS, find_problem, local_test, problems, test_description
 from practice_check import leetgpu_plan, load_module, upstream_leetgpu, xpu_case_sizes, xpu_public_plan
-from practice_workloads import Case
+from practice_workloads import BASE_SEED, Case
 from practice_leetcuda_cases import leetcuda_cases
 from practice_leetcuda_suites import suite_cases
 from practice_xpuoj import case_plan
@@ -62,6 +63,12 @@ def list_cases(problem):
                                          for i, value in enumerate(data))
                 print(f"  #{workload.number} {workload.label} · {description}")
         return
+    if problem.platform in ADVANCED:
+        plan = advanced_plan(problem.platform, problem.key)
+        print(f"独立全输出校验 · {len(plan)} 个用例")
+        for number, spec in enumerate(plan, start=1):
+            print(f"  #{number} {spec.description()} · 种子 {BASE_SEED + number} · 缓冲区守卫")
+        return
     entries = leetcuda_workloads(problem)
     if entries:
         print(f"独立全输出校验 · {len(entries)} 个用例")
@@ -93,6 +100,9 @@ def summarize(platform):
             else:
                 count = len(case_plan(int(problem.key)))
                 suite = "本地生成用例"
+        elif problem.platform in ADVANCED:
+            count = len(advanced_plan(problem.platform, problem.key))
+            suite = "独立全输出校验"
         else:
             count = len(leetcuda_workloads(problem))
             suite = "独立全输出校验"

@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 import torch
 
+from practice_advanced_cases import ADVANCED
 from practice_cases import list_cases
 from practice_catalog import PLATFORMS, ROOT, leetgpu_template, local_test, problems, solution
 from render_leetgpu import render_html
@@ -206,14 +207,18 @@ def main():
     with torch.no_grad():
         for problem in problems():
             target = OUTPUT / problem.platform / f"{problem.key}.md"
-            emit(target, page(problem, target, emit))
+            if problem.platform in ADVANCED:
+                if not target.is_file():
+                    pending.append(target.relative_to(ROOT))
+            else:
+                emit(target, page(problem, target, emit))
             counts[problem.platform] += 1
     index = ["# 题面目录", "", "| 题库 | 条目 |", "| --- | ---: |"]
     for platform, title in PLATFORMS.items():
         index.append(f"| [{title}](../catalogs/{platform}.md) | {counts[platform]} |")
     emit(OUTPUT / "README.md", "\n".join(index) + "\n")
     if pending:
-        sys.exit(f"{len(pending)} 个 Markdown 或图示需要重新生成，首个为 {pending[0]}")
+        sys.exit(f"{len(pending)} 个 Markdown 或图示缺失或待更新，首个为 {pending[0]}")
     print(" · ".join(f"{PLATFORMS[platform]} {count}" for platform, count in counts.items()))
 
 

@@ -9,6 +9,9 @@
 | [LeetGPU](catalogs/leetgpu.md) | 147 | `practice/leetgpu/<题号>/solution.cu` |
 | [XPUOJ](catalogs/xpuoj.md) | 144 | `practice/xpuoj/<题号>/solution.cu` |
 | [LeetCUDA](catalogs/leetcuda.md) | 215 | `practice/leetcuda/kernels/<算子>/` |
+| [FlashInfer](catalogs/flashinfer.md) | 4 | `practice/flashinfer/<题号>/solution.cu` |
+| [FLA](catalogs/fla.md) | 4 | `practice/fla/<题号>/solution.cu` |
+| [FlashAttention](catalogs/flashattn.md) · [CUTLASS](catalogs/cutlass.md) · [Triton](catalogs/triton.md) · [Quack](catalogs/quack.md) · [vLLM](catalogs/vllm.md) | 各 1 | `practice/<题库>/1/solution.cu` |
 
 每个条目都有一份 [Markdown 题面](problems/README.md)，包含实现入口与本地用例。少数 Python / TileLang 题使用 `solution.py`。LeetCUDA 的多个变体可能共用一份源码文件。
 
@@ -60,13 +63,16 @@ LeetGPU 和 XPUOJ 的公开功能用例保留原编号，并追加固定种子�
 
 ## 学习路线
 
-| 阶段 | 练习 | 验收 |
-| --- | --- | --- |
-| 1 | Vector Addition → ReLU → Transpose | 处理尾部线程和非方阵，检查合并访存 |
-| 2 | Dot Product → Reduction → Histogram | 对比共享内存和 warp shuffle，覆盖部分 warp |
-| 3 | Softmax → LayerNorm → RMSNorm | 处理大值和极小方差，验证累加精度 |
-| 4 | SGEMM → HGEMM → CUTLASS GEMM | 覆盖非整 tile 尺寸，和 cuBLAS 比较 |
-| 5 | CuTe layout → Attention → FP8 / FP4 | 验证布局、mask、长序列和量化误差 |
+[完整路线与阶段验收](docs/roadmap.md) 从 CUDA 索引、访存和归约起步，逐步进入数值稳定、GEMM/CuTe、分页 Attention、状态递推和反向传播。每阶段都有主做题、自测命令和性能实验。
+
+~~~bash
+./practice.sh roadmap
+./practice.sh selftest 1 --plan
+./practice.sh selftest 1 --smoke
+./practice.sh selftest 1
+~~~
+
+新增的 13 道源码练习覆盖 7 个库，共 87 个本地用例。每道题带独立 Markdown、CUDA 模板和 PyTorch 数值参考。新增练习沿用本地 CUDA Toolkit 与 PyTorch。项目覆盖与上游源码入口见[算子库覆盖表](docs/library-coverage.md)。
 
 ## 环境与源码
 
@@ -77,4 +83,5 @@ LeetGPU 和 XPUOJ 的公开功能用例保留原编号，并追加固定种子�
 - LeetGPU 题目与模板来自 [AlphaGPU/leetgpu-challenges](https://github.com/AlphaGPU/leetgpu-challenges) 的 `3b2ec31`。
 - LeetCUDA 来自 [xlite-dev/LeetCUDA](https://github.com/xlite-dev/LeetCUDA) 的 `v4.2.2`。
 - XPUOJ 来自 [公开题库](https://xpuoj.com/p) 和 [XPUOJ-ProblemSet](https://github.com/XPUOJ/XPUOJ-ProblemSet) 的 `1a1dd54`。
+- 新增源码快照的固定版本、许可证和本地入口见[算子库覆盖表](docs/library-coverage.md)。
 - CUTLASS / CuTe、cuDNN Frontend 和 FFPA 的上游许可与源码一并保存在对应目录。

@@ -14,11 +14,12 @@ import tempfile
 from time import time_ns
 from urllib.parse import unquote
 
+from practice_advanced_cases import ADVANCED, advanced_plan
 from practice_leetcuda_cases import leetcuda_cases
 from practice_leetcuda_suites import suite_cases
 
 ROOT = Path(__file__).resolve().parent.parent
-PLATFORMS = {"leetgpu": "LeetGPU", "leetcuda": "LeetCUDA", "xpuoj": "XPUOJ"}
+PLATFORMS = {"leetgpu": "LeetGPU", "leetcuda": "LeetCUDA", "xpuoj": "XPUOJ", **ADVANCED}
 ROW = re.compile(r"^- \[([ xX])\] (?:(#\d+) )?\[([^\]]+)\]\(([^)]+)\)(.*)$")
 ORIGINAL_LINK = re.compile(r"\s*·\s*\[原始材料\]\(([^)]+)\)\s*$")
 ENTRYPOINT = re.compile(r'extern\s+"C"\s+void\s+run_kernel\s*\([^;{}]*\)\s*;')
@@ -157,6 +158,8 @@ def leetcuda_workspace(path):
 
 
 def solution(problem, create=False):
+    if problem.platform in ADVANCED:
+        return ROOT / "practice" / problem.platform / problem.key / "solution.cu"
     if problem.platform == "leetcuda":
         path = problem.path
         if path is None:
@@ -240,6 +243,8 @@ def leetcuda_script(problem):
 
 
 def local_test(problem):
+    if problem.platform in ADVANCED:
+        return "advanced"
     if problem.platform == "leetgpu":
         if (problem.path.parent / "challenge.py").is_file():
             return "py" if leetgpu_template(problem).suffix == ".py" else "cuda"
@@ -259,6 +264,8 @@ def local_test(problem):
 
 def test_description(problem):
     mode = local_test(problem)
+    if mode == "advanced":
+        return f"独立判题 {len(advanced_plan(problem.platform, problem.key))} 例"
     if isinstance(mode, Path):
         count = len(leetcuda_cases(mode.stem, problem.title))
         return f"独立判题 {count} 例" if count else "算子级脚本"
@@ -535,10 +542,10 @@ def test(problem, args):
             run_leetcuda(command, workspace_script.parent, env, problem, action)
         return
     source = solution(problem, create=True)
-    command = [sys.executable, "-u", str(ROOT / "tools" / "practice_check.py"),
-               problem.platform, problem.key]
+    script = "practice_advanced.py" if mode == "advanced" else "practice_check.py"
+    command = [sys.executable, "-u", str(ROOT / "tools" / script), problem.platform, problem.key]
     if case is not None or action == "profile":
-        default_case = 1 if problem.platform == "xpuoj" else 0
+        default_case = 0 if problem.platform == "leetgpu" else 1
         command.extend(["--case", str(case if case is not None else default_case)])
     if action in ("bench", "profile"):
         command.extend(["--mode", action, "--warmup", str(args.warmup)])
@@ -600,6 +607,7 @@ def main():
     listing.add_argument("status", nargs="?", default="all", choices=("all", "todo", "done"))
     listing.add_argument("platform", nargs="?", default="all", choices=("all", *PLATFORMS))
     actions.add_parser("audit")
+    actions.add_parser("platforms")
     case_list = actions.add_parser("cases")
     case_list.add_argument("platform", nargs="?", default="all", choices=("all", *PLATFORMS))
     case_list.add_argument("key", nargs="?")
@@ -622,6 +630,11 @@ def main():
     args = parser.parse_args()
     if args.action == "list":
         list_problems(args.status, args.platform)
+        return
+    if args.action == "platforms":
+        print("all\t全部题库")
+        for name, title in PLATFORMS.items():
+            print(name, title, sep="\t")
         return
     if args.action == "audit":
         audit()

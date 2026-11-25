@@ -57,10 +57,11 @@ Ctrl-B 性能 · Ctrl-X 标记 · Ctrl-S 进度筛选 · Ctrl-P 换题库 · Esc
                 case "$status" in all) status=todo ;; todo) status=done ;; done) status=all ;; esac
                 continue ;;
             ctrl-p)
-                case "$platform" in
-                    all) platform=leetgpu ;; leetgpu) platform=leetcuda ;;
-                    leetcuda) platform=xpuoj ;; xpuoj) platform=all ;;
-                esac
+                if chosen_platform=$(backend platforms |
+                    FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE= fzf --layout=reverse \
+                        --delimiter=$'\t' --with-nth=2 --prompt='题库 > '); then
+                    platform=${chosen_platform%%$'\t'*}
+                fi
                 continue ;;
         esac
         [[ -n ${selection[2]:-} ]] || continue
@@ -98,8 +99,10 @@ usage() {
 ./practice.sh bench 题库 题号                        对照基线，保存延迟分布
 ./practice.sh profile 题库 题号 [--tool ncu]             保存 Nsight Systems 时间线
 ./practice.sh audit                                    检查题库、练习文件和测试入口
+./practice.sh roadmap                                  查看完整学习路线
+./practice.sh selftest 1 [--plan] [--smoke]                         运行指定阶段的自测
 
-题库名称为 leetgpu、leetcuda、xpuoj。LeetCUDA 用函数名或清单显示的编号。
+用 ./practice.sh platforms 查看题库名称。LeetCUDA 用函数名或清单显示的编号。
 HELP
 }
 
@@ -107,6 +110,8 @@ case "${1:-}" in
     '') menu ;;
     help|-h|--help) usage ;;
     edit) shift; edit "$@" ;;
-    list|show|test|bench|profile|toggle|preview|audit|source|cases) backend "$@" ;;
+    roadmap) cat "$root/docs/roadmap.md" ;;
+    selftest) shift; "$python" "$root/tools/practice_roadmap.py" "$@" ;;
+    list|show|test|bench|profile|toggle|preview|audit|source|cases|platforms) backend "$@" ;;
     *) usage >&2; exit 2 ;;
 esac

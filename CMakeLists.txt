@@ -24,7 +24,11 @@ endif()
 
 # Generate compilation flags that editors and language servers can use.
 file(GLOB practice_sources CONFIGURE_DEPENDS
-  "practice/leetgpu/*/solution.cu" "practice/xpuoj/*/solution.cu")
+  "practice/leetgpu/*/solution.cu" "practice/xpuoj/*/solution.cu"
+  "practice/flashinfer/*/solution.cu" "practice/fla/*/solution.cu"
+  "practice/flashattn/*/solution.cu" "practice/cutlass/*/solution.cu"
+  "practice/triton/*/solution.cu" "practice/quack/*/solution.cu"
+  "practice/vllm/*/solution.cu")
 if(practice_sources)
   add_library(practice_editor_flags OBJECT EXCLUDE_FROM_ALL ${practice_sources})
   set_target_properties(practice_editor_flags PROPERTIES CUDA_ARCHITECTURES "${practice_cuda_arch}")
